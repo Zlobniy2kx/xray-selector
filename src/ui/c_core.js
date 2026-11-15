@@ -128,7 +128,7 @@ async function markRead(){if(!W||!W.events||!W.events.length)return;const last=W
 // ---------- опрос ----------
 let lastMetT=0;
 async function loadState(bg){
-  try{S=await api('/api/state');W=S.watch||{groups:{},health:{},events:[],settings:{}};}catch(e){$('#apiPill').innerHTML='<span class="dot bad"></span>панель недоступна';return}
+  try{S=await api('/api/state');for(const k of ['servers','groups','dead','testing'])if(!Array.isArray(S[k]))S[k]=[];W=S.watch||{groups:{},health:{},events:[],settings:{}};}catch(e){$('#apiPill').innerHTML='<span class="dot bad"></span>панель недоступна';return}
   const ok=!S.apiError&&S.apiInConfig;
   $('#apiPill').innerHTML=`<span class="dot ${ok?'live':'bad'}"></span>${ok?'Xray онлайн · API':'Xray API недоступен'}`;
   $('#ver').textContent=S.version.replace(/\.0$/,'');
