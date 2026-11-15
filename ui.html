@@ -1596,7 +1596,6 @@ function maintExtra(){const a=ABOUT||{};const g=a.guard||{};
   <div class="card" data-st="maint"><h3>О программе</h3>
     <div class="kv"><div><span>Название</span><b>${esc(a.name||'xray-selector')}</b></div><div><span>Версия</span><b class="mono">${esc(a.version||(S&&S.version)||'')}</b></div><div><span>Автор</span><b>${esc(a.author||'Злобыч')}</b></div></div>
     <div class="note" style="margin-top:8px">${esc(a.desc||'')}</div>
-    ${isExpert()&&!a.demo?`<div class="note" style="margin-top:8px">Учебный режим — копия панели на порту 9092, где можно пробовать что угодно, не трогая роутер. Запуск по SSH: <code>xray-selector -demo &amp;</code>, удаление: <code>xray-selector -demo-remove</code>.</div>`:''}
     <div class="tools" style="margin-top:8px">${a.projectURL?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(a.projectURL)}">Страница проекта ↗</a>`:''}${a.supportURL?`<a class="lnk" target="_blank" rel="noopener" href="${esc(a.supportURL)}" style="font-size:13px">♥ Сказать спасибо разработчику</a>`:''}</div></div>
   </div>`;
 }
