@@ -446,7 +446,14 @@ func outboundsFile() (string, error) {
 		}
 	}
 	if best == "" {
-		return "", errors.New("не нашёл файл с outbounds")
+		// Свежая установка XKeen: конфиги — заготовки с одними комментариями,
+		// массива outbounds нет ни в одном файле. Серверы из подписки всё равно
+		// нужно куда-то положить, поэтому берём штатный 04_outbounds.json —
+		// если его нет, planSub создаст файл при записи.
+		if _, err := os.Stat(*flagConfDir); err != nil {
+			return "", errors.New("не нашёл папку конфигов Xray: " + *flagConfDir)
+		}
+		return filepath.Join(*flagConfDir, "04_outbounds.json"), nil
 	}
 	return best, nil
 }
@@ -469,12 +476,14 @@ func planSub(r *subResult) (*subPlan, error) {
 		return nil, err
 	}
 	b, err := os.ReadFile(f)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(stripJSONComments(b), &doc); err != nil {
-		return nil, err
+	if len(b) > 0 {
+		if err := json.Unmarshal(stripJSONComments(b), &doc); err != nil {
+			return nil, err
+		}
 	}
 	var old []map[string]any
 	json.Unmarshal(doc["outbounds"], &old)
@@ -533,6 +542,23 @@ func planSub(r *subResult) (*subPlan, error) {
 	sort.Strings(plan.Removed)
 	for _, o := range keep {
 		all = append(all, o)
+	}
+	// Правила панели ссылаются на теги direct и block. На свежем XKeen
+	// (в 04_outbounds.json был только комментарий) их нет, и Xray не стартует
+	// с «could not find outbound: direct» — добавляем стандартные.
+	for _, std := range []struct{ tag, proto string }{{"direct", "freedom"}, {"block", "blackhole"}} {
+		exists := false
+		for _, o := range all {
+			if m, ok := o.(map[string]any); ok {
+				if t, _ := m["tag"].(string); t == std.tag {
+					exists = true
+					break
+				}
+			}
+		}
+		if !exists {
+			all = append(all, map[string]any{"tag": std.tag, "protocol": std.proto})
+		}
 	}
 	doc2 := map[string]any{"outbounds": all}
 	out, _ := json.MarshalIndent(doc2, "", "  ")
