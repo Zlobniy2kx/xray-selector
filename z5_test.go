@@ -32,3 +32,15 @@ func TestStats29(t *testing.T) {
 		t.Fatal("jitter penalty")
 	}
 }
+
+func TestVerNewerSuffix(t *testing.T) {
+	cases := []struct {
+		a, b string
+		w    bool
+	}{{"0.9.1", "0.9", true}, {"0.9c", "0.9", true}, {"0.9c", "0.9b", true}, {"0.9", "0.9c", false}, {"1.0", "0.9c", true}, {"0.9", "0.9", false}, {"v0.9.1", "0.9.1", false}}
+	for _, c := range cases {
+		if verNewer(c.a, c.b) != c.w {
+			t.Errorf("verNewer(%q,%q) != %v", c.a, c.b, c.w)
+		}
+	}
+}

@@ -93,19 +93,29 @@ var upd struct {
 	Busy    bool   `json:"busy"`
 }
 
-// verNewer: "2.3.1" > "2.3.0"
+// verNewer: "2.3.1" > "2.3.0", "0.9c" > "0.9b" > "0.9"
 func verNewer(a, b string) bool {
 	pa, pb := strings.Split(strings.TrimPrefix(a, "v"), "."), strings.Split(strings.TrimPrefix(b, "v"), ".")
+	part := func(p []string, i int) (int, string) {
+		if i >= len(p) {
+			return 0, ""
+		}
+		s := p[i]
+		k := 0
+		for k < len(s) && s[k] >= '0' && s[k] <= '9' {
+			k++
+		}
+		n, _ := strconv.Atoi(s[:k])
+		return n, strings.ToLower(s[k:])
+	}
 	for i := 0; i < len(pa) || i < len(pb); i++ {
-		var x, y int
-		if i < len(pa) {
-			x, _ = strconv.Atoi(strings.TrimFunc(pa[i], func(r rune) bool { return r < '0' || r > '9' }))
-		}
-		if i < len(pb) {
-			y, _ = strconv.Atoi(strings.TrimFunc(pb[i], func(r rune) bool { return r < '0' || r > '9' }))
-		}
+		x, xs := part(pa, i)
+		y, ys := part(pb, i)
 		if x != y {
 			return x > y
+		}
+		if xs != ys {
+			return xs > ys
 		}
 	}
 	return false
@@ -150,13 +160,13 @@ func (a *app) checkUpdate() error {
 }
 
 func (a *app) updateLoop() {
-	time.Sleep(5 * time.Minute)
+	time.Sleep(1 * time.Minute)
 	for {
 		if githubRepo != "" && !demoMode {
 			guard.pace(10 * time.Minute)
 			a.checkUpdate()
 		}
-		time.Sleep(24 * time.Hour)
+		time.Sleep(6 * time.Hour)
 	}
 }
 
