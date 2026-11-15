@@ -27,7 +27,7 @@ import (
 //go:embed ui.html
 var uiFS embed.FS
 
-var version = "0.9.1"
+var version = "0.9.2"
 
 var (
 	flagListen   = flag.String("listen", "192.168.1.1:9091", "адрес веб-панели")
