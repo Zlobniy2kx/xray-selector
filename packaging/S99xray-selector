@@ -1,0 +1,10 @@
+#!/bin/sh
+# Entware init-скрипт для xray-selector
+ENABLED=yes
+PROCS=xray-selector
+ARGS="-listen 192.168.1.1:9091 -log /opt/var/log/xray-selector.log"
+PREARGS=""
+DESC=$PROCS
+PATH=/opt/sbin:/opt/bin:/opt/usr/sbin:/opt/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+. /opt/etc/init.d/rc.func
