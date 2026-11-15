@@ -57,6 +57,23 @@ else
   echo "Секция api уже есть в конфигах — проверьте, что в services есть RoutingService и ObservatoryService, а listen = 127.0.0.1:10085"
 fi
 
+# api.services с ObservatoryService требует секции observatory, иначе Xray не
+# стартует вообще: "core: not all dependencies are resolved". На свежем XKeen
+# этой секции нет — панель после установки показывала бы «Xray не запускается».
+if grep -qs 'ObservatoryService' "$CONF"/*.json && ! grep -qs 'observatory' "$CONF"/*.json; then
+  cat > "$CONF/08_observatory.json" <<'JSON'
+{
+  "observatory": {
+    "subjectSelector": [],
+    "probeURL": "https://www.gstatic.com/generate_204",
+    "probeInterval": "10m"
+  }
+}
+JSON
+  echo "Создан $CONF/08_observatory.json (без него Xray не запускается с ObservatoryService)"
+  NEED_RESTART=1
+fi
+
 if [ "$NEED_RESTART" = 1 ]; then
   echo "Перезапускаю XKeen…"
   xkeen -restart || echo "Не удалось перезапустить — выполните: xkeen -restart"
