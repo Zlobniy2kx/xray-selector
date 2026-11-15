@@ -151,8 +151,14 @@ func (a *app) checkUpdate() error {
 		rel.Body = rel.Body[:1500] + "…"
 	}
 	upd.Notes = rel.Body
+	// архив: xray-selector.tar.gz или с версией в имени (xray-selector-0.9.3.tar.gz)
 	for _, as := range rel.Assets {
-		if as.Name == "xray-selector.tar.gz" {
+		n := strings.ToLower(as.Name)
+		if n == "xray-selector.tar.gz" {
+			upd.Asset = as.URL
+			break
+		}
+		if strings.HasPrefix(n, "xray-selector") && strings.HasSuffix(n, ".tar.gz") && upd.Asset == "" {
 			upd.Asset = as.URL
 		}
 	}

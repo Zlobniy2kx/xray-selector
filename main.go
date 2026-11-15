@@ -27,7 +27,7 @@ import (
 //go:embed ui.html
 var uiFS embed.FS
 
-var version = "0.9.2"
+var version = "0.9.2.1"
 
 var (
 	flagListen   = flag.String("listen", "192.168.1.1:9091", "адрес веб-панели")
@@ -975,6 +975,7 @@ func main() {
 	go a.digestLoop()
 	go a.subLoop()
 	go a.updateLoop()
+	go a.defaultsLoop()
 	go a.rulesLoop()
 	go a.hourlyLoop()
 	go a.hintsLoop()

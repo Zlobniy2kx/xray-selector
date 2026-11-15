@@ -37,7 +37,7 @@ func TestVerNewerSuffix(t *testing.T) {
 	cases := []struct {
 		a, b string
 		w    bool
-	}{{"0.9.1", "0.9", true}, {"0.9c", "0.9", true}, {"0.9c", "0.9b", true}, {"0.9", "0.9c", false}, {"1.0", "0.9c", true}, {"0.9", "0.9", false}, {"v0.9.1", "0.9.1", false}}
+	}{{"0.9.1", "0.9", true}, {"0.9c", "0.9", true}, {"0.9c", "0.9b", true}, {"0.9", "0.9c", false}, {"1.0", "0.9c", true}, {"0.9", "0.9", false}, {"v0.9.1", "0.9.1", false}, {"0.9.2.1", "0.9.2", true}, {"0.9.3", "0.9.2.1", true}, {"0.9.4", "0.9.3", true}, {"0.9.3.1", "0.9.3", true}, {"0.9.4", "0.9.3.1", true}, {"0.9.31", "0.9.4", true}}
 	for _, c := range cases {
 		if verNewer(c.a, c.b) != c.w {
 			t.Errorf("verNewer(%q,%q) != %v", c.a, c.b, c.w)

@@ -364,7 +364,7 @@ const winSec=()=>21600, winTxt=()=>'6 ч';
 
 // ---------- тема и эффекты ----------
 function applyTheme(){
-  document.body.classList.toggle('simple',store.get('uiMode','simple')!=='expert');
+  document.body.classList.remove('simple');
   let t=store.get('theme','xrock');if(t==='unifi'){t='xrock';store.set('theme',t)} document.documentElement.dataset.theme=t;
   const fxPref=store.get('fx','auto'); const full=fxPref==='full'||(fxPref==='auto'&&!isMobile()&&matchMedia('(pointer:fine)').matches);
   document.body.classList.toggle('fx',full);
@@ -412,7 +412,7 @@ document.addEventListener('mousemove',e=>{if(!fxOn())return;const c=e.target.clo
 // Ключ вкладки: «страница» или «страница:фильтр». Страница — это <section id="p-…">.
 const SECS=[['home','◉','Обзор'],['watch','🛡','Сторож',[['watch','Обзор'],['settings:watch','Настройки']]],['servers','☰','Серверы'],
   ['devices','📱','Устройства',[['devices','Список'],['map','Карта']]],
-  ['sites','🌐','Правила'],['net','📶','Сеть',[['net','Состояние'],['tools:reserve','Резерв']]],
+  ['sites','🌐','Правила'],['net','📶','Сеть'],
   ['logs','🗒','Журнал',[['events','События'],['logs:access','Xray'],['logs:keenetic','Роутер'],['logs:selector','Программа']]],
   ['settings','⚙','Настройки',[['settings:main','Основные'],['settings:tg','Telegram'],['tools:sub','Подписка'],['tools:xray','Xray'],['settings:pw','Пароль']]]];
 const PAGES=SECS; // совместимость со старым кодом
@@ -449,6 +449,7 @@ function go(p){
   if(page==='logs') syncLogTab();
   renderNav(); renderPage(); window.scrollTo(0,0); if(typeof renderSiteBar==='function')renderSiteBar();
   if(page==='logs') loadLogs(); if(page==='sites'){loadSites();loadRules()} if(page==='tools') loadTools(); if(page==='devices'){loadDevices();typeof loadRules==='function'&&loadRules()} if(page==='map') loadFlow(); if(page==='events') markRead();
+  if(page==='settings'&&typeof loadRules==='function'&&!RUL)loadRules().then(()=>{if(page==='settings')renderPage()});
   if(page==='net'){typeof loadDNS==='function'&&loadDNS();typeof loadPulse==='function'&&loadPulse()}
 }
 // показать только карточки текущей вкладки (data-st="…")
@@ -477,12 +478,16 @@ async function markRead(){if(!W||!W.events||!W.events.length)return;const last=W
 
 // ---------- опрос ----------
 let lastMetT=0;
-async function loadState(){
+async function loadState(bg){
   try{S=await api('/api/state');W=S.watch||{groups:{},health:{},events:[],settings:{}};}catch(e){$('#apiPill').innerHTML='<span class="dot bad"></span>панель недоступна';return}
   const ok=!S.apiError&&S.apiInConfig;
   $('#apiPill').innerHTML=`<span class="dot ${ok?'live':'bad'}"></span>${ok?'Xray онлайн · API':'Xray API недоступен'}`;
   $('#ver').textContent=S.version.replace(/\.0$/,'');
-  renderBell(); renderNav(); renderPage();
+  renderBell(); renderNav();
+  // фоновый опрос не перерисовывает страницы с формами (настройки, подписка, резерв, Xray):
+  // иначе прыгает экран и сбрасываются переключатели. Они обновляются при переходе и после «Сохранить».
+  if(bg&&(page==='settings'||page==='tools'))return;
+  renderPage();
 }
 async function loadMetrics(){
   try{const m=await api('/api/metrics?since='+lastMetT);if(!MET||!lastMetT){MET=m}else{MET.points=MET.points.concat(m.points).slice(-1800);Object.assign(MET,{...m,points:MET.points})}
@@ -563,9 +568,9 @@ function renderMetrics(){
   const box=$('#metCards'); if(!box) return; const m=MET; const P=(m&&m.points)||[]; const last=P[P.length-1]||{};
   const memMB=last.mem?Math.round(last.mem/1024):0, totMB=m&&m.memTotal?Math.round(m.memTotal/1024):0;
   const cards=[
-    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?(()=>{const l=parseFloat(String(m.load).split(/\s+/)[0])||0,c=m.cores||1,r=l/c;return (r<0.7?'роутер спокоен':r<1.5?'роутер занят':'роутер перегружен')+' · очередь '+l.toFixed(2)+' на '+c+' яд.'})():'',P.map(p=>p.cpu),'#a78bfa'],
+    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?(()=>{const l=parseFloat(String(m.load).split(/\s+/)[0])||0,c=m.cores||1,r=l/c;return (r<0.7?'роутер справляется легко':r<1.5?'роутер заметно занят':'роутер перегружен')})():'',P.map(p=>p.cpu),'#a78bfa'],
     ['Память',totMB?totMB+' МБ':'',`${memMB||'—'}<small>МБ · ${totMB?Math.round(memMB*100/totMB):'—'}%</small>`,last.xrayM?'Xray: '+Math.round(last.xrayM/1024)+' МБ':'',P.map(p=>p.mem),'#22d3ee'],
-    ['Интернет'+(m&&m.iface?' · '+m.iface:''),`↑ ${last.tx??'—'}`,`↓ ${last.rx??'—'}<small>Мбит/с</small>`,'вход и выход за час',P.map(p=>p.rx),'#34d399',P.map(p=>p.tx)],
+    ['Интернет'+(m&&m.iface?' · '+m.iface:''),`↑ ${last.tx??'—'}`,`↓ ${last.rx??'—'}<small>Мбит/с</small>`,'↓ скачивание · ↑ отдача, график за час',P.map(p=>p.rx),'#34d399',P.map(p=>p.tx)],
     m&&m.hasTemp?['Температура','',`${last.temp?last.temp.toFixed(0):'—'}<small>°C</small>`,'датчик роутера',P.map(p=>p.temp),'#fbbf24']
       :['Xray (память)','',`${last.xrayM?Math.round(last.xrayM/1024):'—'}<small>МБ</small>`,'датчика температуры нет',P.map(p=>p.xrayM),'#fbbf24'],
   ];
@@ -582,7 +587,7 @@ function trafficBlock(){
   const t=TRF.today||{}; const names=(S&&S.devNames)||{};
   const top=(o,n,lab)=>Object.entries(o||{}).map(([k,v])=>[k,(v.up||0)+(v.down||0),v.conns||0]).filter(x=>x[1]||x[2]).sort((a,b)=>(b[1]-a[1])||(b[2]-a[2])).slice(0,n);
   const svc=top(t.services,10); const mx=Math.max(1,...svc.map(x=>x[1]||x[2])); const totB=Object.values(t.services||{}).reduce((a,v)=>a+(v.up||0)+(v.down||0),0)||1;
-  let warn=''; if(!TRF.statsConfigured) warn=`<div class="banner" style="margin-bottom:10px">Точный трафик по серверам выключен в Xray. <span class="lnk" data-go="settings">Включить в настройках →</span></div>`;
+  let warn=''; if(!TRF.statsOK) warn=`<div class="note" style="margin-bottom:10px">Трафик по серверам начнёт считаться после ближайшего перезапуска Xray.</div>`;
   if(TRF.ctErr) warn+=`<div class="note" style="margin-bottom:8px">По устройствам: ${esc(TRF.ctErr)}</div>`;
   return warn+`<div>${svc.map(([k,b,c])=>{const ip=k==='по IP-адресу';return `<div style="display:grid;grid-template-columns:minmax(110px,170px) 1fr 74px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b class="${ip?'n':''}">${esc(ip?'прочие (только IP)':k)}</b><div class="note">${c} соед.</div></div><div class="prog"><i style="width:${Math.round((b||c)*100/mx)}%"></i></div><div class="mono" style="text-align:right">${b?gb(b):'—'}<div class="note">${b?Math.round(b*100/totB)+'%':''}</div></div></div>`}).join('')||'<div class="note">пока нет данных</div>'}</div><div class="note" style="margin-top:8px">Сервис определяется по имени сайта, а приложения, которые ходят сразу по IP (Telegram, звонки, игры), — по известным диапазонам и по спискам из раздела «Правила».</div>`;
 }
@@ -707,18 +712,18 @@ function renderDrawer(d){
 
 <script>
 function homeProviders(){const w=TRF&&TRF.wans||[];const by=TRF&&TRF.ispBy||{};
-  if(!w.length){const isp=TRF&&TRF.isp||[];return `<div class="card"><h3>Интернет провайдера · 24 часа<span class="r">${isp.length&&isp[isp.length-1].ok?'пинг сейчас '+isp[isp.length-1].ms+' мс':''}</span></h3><div class="bar" style="height:12px">${ispBar(isp)}</div></div>`}
-  return `<div class="card"><h3>Подключения<span class="r">провайдеры — связь с Яндексом раз в минуту · VPN — проверка сервисов</span></h3><div class="note" style="margin:2px 0 4px;font-weight:600">Провайдеры · 24 часа</div>${w.map(x=>{const l=by[x.name]||[],last=l[l.length-1],bad=l.filter(p=>!p.ok).length;
-    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id)}</b> <span class="tag ${x.role==='основной'?'a':''}">${esc(x.role||'')}</span>${x.active?' <span class="tag g">● активен</span>':''}<div class="note">${esc(x.id)} · ${esc(x.name)}${x.ip?' · '+esc(x.ip):''} · приоритет ${x.prio}</div></div>
+  if(!w.length){const isp=TRF&&TRF.isp||[];return `<div class="card"><h3>Интернет провайдера · 24 часа<span class="r">${isp.length&&isp[isp.length-1].ok?'пинг сейчас '+isp[isp.length-1].ms+' мс':''}</span></h3><div class="bar" style="height:12px">${ispBar(isp)}</div>${connVPN()}</div>`}
+  return `<div class="card"><h3>Подключения</h3><div class="note" style="margin:2px 0 4px;font-weight:600">Провайдеры · 24 часа</div>${w.map(x=>{const l=by[x.name]||[],last=l[l.length-1],bad=l.filter(p=>!p.ok).length;
+    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id)}</b> <span class="tag ${x.role==='основной'?'a':''}">${esc(x.role||'')}</span>${x.active?' <span class="tag g">● активен</span>':''}</div>
       <div class="bar" style="height:12px">${ispBar(l)}</div><div class="mono ${!last?'n':last.ok?'g':'b'}" style="white-space:nowrap">${!last?'—':last.ok?last.ms+' мс':'нет связи'}${bad?` <span class="m">· ${bad} сбоев</span>`:''}</div></div>`}).join('')}${connVPN()}</div>`}
 // VPN и прокси Keenetic (WireGuard, Proxy…) — внутри блока «Подключения»
 function connVPN(){const l=(typeof TUN!=='undefined'&&TUN&&TUN.tunnels)||[];
-  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси Keenetic не проверяются. Отметьте их в «Сеть → Резерв», чтобы видеть здесь, работают ли они.</div>`;
-  return `<div class="note" style="margin:12px 0 4px;font-weight:600">VPN и прокси Keenetic</div>${l.map(r=>{const x=r.iface,h=r.health;
+  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси в Keenetic не найдены. Добавьте WireGuard, OpenVPN или прокси в Keenetic («Интернет» → «Другие подключения») — они появятся здесь, и их можно будет взять в резерв.</div>`;
+  return `<div class="note" style="margin:12px 0 4px"><b>VPN и прокси Keenetic</b> · переключатель — резерв: если не работает ни один сервер подписки, панель перейдёт на отмеченное подключение</div>${l.map(r=>{const x=r.iface,h=r.health;
     const okN=h&&h.targets?Object.values(h.targets).filter(t=>t.ok).length:0,all=h&&h.targets?Object.keys(h.targets).length:0;
-    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id||x.name)}</b>${r.inReserve?' <span class="tag">в резерве</span>':''}${TUN.active===x.tag?' <span class="tag g">● сейчас через него</span>':''}<div class="note">${esc(x.type)} · ${esc(x.id||x.name)}</div></div>
+    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><label class="sw" style="display:inline-flex;vertical-align:middle;margin-right:6px" title="Резерв: переключаться сюда, если не работает ни один сервер подписки"><input type="checkbox" class="tunRes" value="${esc(x.name)}" ${r.inReserve?'checked':''}><span class="k"></span></label><b>${esc(x.desc||x.id||x.name)}</b>${TUN.active===x.tag?' <span class="tag g">● сейчас через него</span>':''}<div class="note">${esc(x.type)} · ${esc(x.id||x.name)}</div></div>
       <div class="note">${!h||!h.t?'ещё не проверялось':h.ok?`<span class="g">✓ работает</span> · сервисы ${okN}/${all}${h.speedKbps?' · '+mbps(h.speedKbps)+' Мбит/с':''}`:`<span class="b">✕ ${esc(h.reason||'не открывает сервисы')}</span>`}</div>
-      <div class="mono ${!h||!h.t?'n':h.ok?'g':'b'}" style="white-space:nowrap" title="отклик сервисов через это подключение (медиана)">${(()=>{const ms=h&&h.targets?Object.values(h.targets).filter(t=>t.ok&&t.ms).map(t=>t.ms).sort((a,b)=>a-b):[];return ms.length?ms[ms.length>>1]+' мс':'—'})()}</div></div>`}).join('')}`}
+      <div class="mono ${!h||!h.t?'n':h.ok?'g':'b'}" style="white-space:nowrap" title="отклик сервисов через это подключение (медиана)">${(()=>{const ms=h&&h.targets?Object.values(h.targets).filter(t=>t.ok&&t.ms).map(t=>t.ms).sort((a,b)=>a-b):[];return ms.length?ms[ms.length>>1]+' мс':'—'})()}</div></div>`}).join('')}<label class="sw" style="display:flex;margin-top:10px"><input type="checkbox" id="tunAuto" ${TUN.auto?'checked':''}><span class="k"></span>Брать в резерв новые подключения автоматически (с проверкой)</label>`}
 function homeTunnels(){if(typeof TUN==='undefined'||!TUN||!(TUN.tunnels||[]).length)return '';
   return `<div class="card"><h3>🛟 Резервные подключения Keenetic<span class="r lnk" data-go="watch">подробнее →</span></h3><div class="grid g3">${TUN.tunnels.map(r=>{const x=r.iface,h=r.health,sc=r.score;
     const okN=h&&h.targets?Object.values(h.targets).filter(t=>t.ok).length:0,all=h&&h.targets?Object.keys(h.targets).length:0;
@@ -895,7 +900,7 @@ function renderSettings(){const el=$('#p-settings');if(el.contains(document.acti
   const st=W.settings||{}; const th=store.get('theme','xrock'), fx=store.get('fx','auto');
   const tgOK=st.tgToken&&st.tgChatID;
   el.innerHTML=`
-  <div class="card" data-st="main"><h3>Оформление</h3><div class="tools"><span class="note">Тема:</span><div class="seg">${[['xrock','Ночная'],['srm','Светлая (SRM)']].map(([k,t])=>`<button data-settheme="${k}" class="${th===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card" data-st="main"><h3>Оформление</h3><div class="tools"><span class="note">Тема:</span><div class="seg">${[['xrock','Тёмная'],['srm','Светлая']].map(([k,t])=>`<button data-settheme="${k}" class="${th===k?'on':''}">${t}</button>`).join('')}</div>
    <span class="note" style="margin-left:14px">Эффекты:</span><div class="seg">${[['auto','Авто'],['full','Полные'],['lite','Лёгкие']].map(([k,t])=>`<button data-fx="${k}" class="${fx===k?'on':''}">${t}</button>`).join('')}</div></div>
    <div class="note" style="margin-top:8px">«Авто»: на компьютере — живой фон, стекло, 3D-наклон карточек и частицы на карте; на телефоне — лёгкая версия. Тема и эффекты запоминаются на каждом устройстве отдельно.</div></div>
   <div class="card" data-st="watch"><h3>Настройки сторожа</h3><div class="fg">
@@ -936,12 +941,8 @@ function renderSettings(){const el=$('#p-settings');if(el.contains(document.acti
     <label class="full"><span class="sw"><input type="checkbox" id="pinOn" ${st.tgPinStatus?'checked':''}><span class="k"></span>Закреплённый «живой» статус в группе</span></label>
     <label class="full"><span class="sw"><input type="checkbox" id="clOn" ${st.tgCleanGroup?'checked':''}><span class="k"></span>Удалять в группе /status и ответ через минуту</span></label>
    </div><div class="tools" style="margin-top:10px"><button class="btn pri" id="sSave2">Сохранить</button></div></div>
-  <div class="card x-exp" data-st="main"><h3>Трафик</h3><div class="note" style="margin-bottom:10px">Точные гигабайты по серверам считает сам Xray — для этого в его конфиг нужно добавить статистику (программа сделает это сама, с резервной копией) и перезапустить Xray. По устройствам — по счётчикам соединений роутера: ${TRF?(TRF.ctOK?'<span class="g">работает</span>':'<span class="m">'+esc(TRF.ctErr||'нет данных')+'</span>'):'…'}.</div>
-   <div class="tools">${TRF&&TRF.statsConfigured?`<span class="tag g">✓ статистика Xray включена${TRF.statsOK?'':' — ждёт перезапуска Xray'}</span>`:'<button class="btn pri" id="enStats">Включить точный трафик по серверам</button>'}
-   ${TRF&&TRF.tgRoute?'<span class="tag g">✓ адреса Telegram идут через VPN</span>':'<button class="btn" id="enTgRoute">Пустить адреса Telegram через VPN</button>'}</div></div>
   <div class="card" data-st="main"><h3>Резервная копия настроек</h3><div class="note" style="margin-bottom:10px">Сторож, мёртвые серверы, бот, настройки и имена устройств — одним файлом.</div>
-   <div class="tools"><a class="btn" href="/api/backup" download>⬇ Скачать копию</a><label class="btn">⬆ Восстановить из файла<input type="file" id="restoreFile" accept=".json" style="display:none"></label></div></div>
-  <div class="card" data-st="main"><h3>Приложение на телефоне</h3><div class="note" style="line-height:1.6">iPhone: откройте эту страницу в Safari → «Поделиться» → <b>«На экран Домой»</b>. Компьютер (Chrome/Edge): значок «Установить» в адресной строке. Панель откроется как отдельное приложение со своей иконкой.</div></div>`;
+   <div class="tools"><a class="btn" href="/api/backup" download>⬇ Скачать копию</a><label class="btn">⬆ Восстановить из файла<input type="file" id="restoreFile" accept=".json" style="display:none"></label></div></div>`;
   $('#tgEv').value=st.tgEvents==='off'?'off':(st.tgLevel||'important');
   filterCards(el);
 }
@@ -1117,7 +1118,7 @@ document.addEventListener('click',async e=>{
     try{const r=await api('/api/reserve',{check:n});o.innerHTML=r.ok?'<span class="g">✓ сервисы открываются</span>':'<span class="b">✕ '+esc(r.why||'не открываются')+'</span>'}catch(err){o.textContent=err.message}return}
   if(t=T('#resSave')){const ifaces=[...document.querySelectorAll('.resChk:checked')].map(x=>x.value);const out=$('#resOut');
     if(!confirm(ifaces.length?'Записать резерв в конфиг Xray? Xray перезапустится (5–10 с).':'Убрать резерв из конфига? Xray перезапустится.'))return;out.innerHTML='<span class="spin"></span>';
-    try{await api('/api/reserve',{ifaces,auto:$('#resAuto').checked});out.textContent='Готово';loadTools()}catch(err){out.textContent=err.message}return}
+    try{await api('/api/reserve',{ifaces,auto:$('#resAuto').checked});RES_DRAFT=null;out.textContent='Готово';loadTools()}catch(err){out.textContent=err.message}return}
   if(t=T('#geoUpd')){if(!confirm('Обновить базы geosite/geoip (xkeen -ug)? Займёт 1–5 минут, Xray перезапустится.'))return;const out=$('#geoOut');out.innerHTML='<span class="spin"></span> обновляю…';t.disabled=true;
     try{const r=await api('/api/maint',{action:'geo'});out.innerHTML=`<pre class="log" style="max-height:200px">${esc(r.output||'')}</pre>`;loadTools()}catch(err){out.textContent=err.message}t.disabled=false;return}
   if(t=T('#dnsNow')){t.disabled=true;t.textContent='проверяю…';await loadDNS(true);return}
@@ -1138,6 +1139,25 @@ function planHTML(p){if(!p)return'';const l=(a,n)=>a&&a.length?`<div class="note
 let TOOLS=null;
 function fmtLeftJS(sec){return sec<86400?Math.round(sec/3600)+' ч':Math.round(sec/86400)+' дн'}
 async function loadTools(){try{const [m,s,r]=await Promise.all([api('/api/maint'),api('/api/sub'),api('/api/reserve')]);TOOLS={m,s,r}}catch(e){TOOLS={error:e.message}}if(page==='tools')renderTools()}
+// черновик резерва: пока не нажато «Сохранить», переключатели не сбрасываются при обновлении страницы
+let RES_DRAFT=null;
+// резерв прямо в «Подключениях»: каждый переключатель сохраняется сразу
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.matches('.tunRes')){const nm=t.value,on=t.checked,row=(TUN&&TUN.tunnels||[]).find(r=>r.iface.name===nm);const title=row?(row.iface.desc||row.iface.id||nm):nm;
+    if(!confirm((on?'Взять «'+title+'» в резерв?':'Убрать «'+title+'» из резерва?')+' Xray перезапустится, связь пропадёт на 5–10 секунд.')){t.checked=!on;return}
+    const list=(TUN.tunnels||[]).filter(r=>r.iface.name===nm?on:r.inReserve).map(r=>r.iface.name);
+    try{await api('/api/reserve',{ifaces:list});if(row)row.inReserve=on;toast(on?'Добавлено в резерв':'Убрано из резерва');loadTunnels()}catch(err){t.checked=!on;alert(err.message)}return}
+  if(t.id==='tunAuto'){const v=t.checked;try{await api('/api/reserve',{auto:v});if(TUN)TUN.auto=v;toast(v?'Новые подключения будут браться в резерв сами':'Автоподхват выключен')}catch(err){t.checked=!v;toast(err.message)}}});
+// состояние подключения: Keenetic «поднято» ещё не значит, что через него открываются сервисы
+function resStatus(i){if(!i.up)return '<span class="b">не подключено</span>';
+  const t=(typeof TUN!=='undefined'&&TUN&&TUN.tunnels||[]).find(x=>x.iface&&x.iface.name===i.name);const h=t&&t.health;
+  if(!h||!h.t)return '<span class="g">подключено</span> · <span class="n">сервисы ещё не проверялись</span>';
+  return h.ok?'<span class="g">подключено · сервисы открываются</span>':'<span class="m">подключено, но сервисы не открываются</span>'+(h.reason&&!/не открыва/.test(h.reason)?' <span class="n">('+esc(h.reason)+')</span>':'')}
+document.addEventListener('change',async e=>{if(e.target.matches('#resAuto')){const v=e.target.checked;
+    try{await api('/api/reserve',{auto:v});if(TOOLS&&TOOLS.r)TOOLS.r.auto=v;if(RES_DRAFT)RES_DRAFT.auto=v;toast(v?'Новые подключения будут подхватываться сами':'Автоподхват выключен')}catch(err){e.target.checked=!v;toast(err.message)}return}
+  if(!e.target.matches('.resChk'))return;
+  RES_DRAFT={ifaces:new Set([...document.querySelectorAll('.resChk:checked')].map(x=>x.value)),auto:!!($('#resAuto')&&$('#resAuto').checked)};
+  const o=$('#resOut');if(o)o.innerHTML='<span class="m">Есть несохранённые изменения — нажмите «Сохранить резерв».</span>'});
 function renderTools(){
   const el=$('#p-tools'); if(el.contains(document.activeElement)&&['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;
   if(!TOOLS){el.innerHTML='<div class="card empty"><span class="spin"></span></div>';return}
@@ -1162,12 +1182,12 @@ function renderTools(){
 
   <div class="card" data-st="reserve"><h3>Резерв через подключения Keenetic</h3>
    <div class="note" style="margin-bottom:8px">Если ни один сервер подписки не работает (провайдер режет всё), сторож по очереди проверит отмеченные подключения роутера — WireGuard, прокси, OpenVPN — и переключится на первое рабочее. Когда серверы оживут, вернётся на них.</div>
-   ${(r.ifaces||[]).length?`<table class="t">${r.ifaces.map(i=>{const on=(r.configured||[]).some(c=>c.iface===i.name);return `<tr><td><label class="sw"><input type="checkbox" class="resChk" value="${esc(i.name)}" ${on?'checked':''}><span class="k"></span></label></td>
-     <td><b>${esc(i.type)} · ${esc(i.id||i.name)}</b>${i.desc?` <span class="note">${esc(i.desc)}</span>`:''}<div class="note">${esc(i.name)} · ${i.up?'<span class="g">подключено</span>':'<span class="b">не подключено</span>'}${on?' · <span class="g">в резерве</span>':''}</div></td>
+   ${(r.ifaces||[]).length?`<table class="t">${r.ifaces.map(i=>{const on=RES_DRAFT?RES_DRAFT.ifaces.has(i.name):(r.configured||[]).some(c=>c.iface===i.name);return `<tr><td><label class="sw"><input type="checkbox" class="resChk" value="${esc(i.name)}" ${on?'checked':''}><span class="k"></span></label></td>
+     <td><b>${esc(i.type)} · ${esc(i.id||i.name)}</b>${i.desc?` <span class="note">${esc(i.desc)}</span>`:''}<div class="note">${resStatus(i)}${(r.configured||[]).some(c=>c.iface===i.name)?' · <span class="g">в резерве</span>':''}</div></td>
      <td><button class="btn sm" data-rescheck="${esc(i.name)}">Проверить</button><div class="note" id="rc_${esc(i.name)}"></div></td></tr>`}).join('')}</table>
-   <label class="sw" style="margin-top:10px;display:flex"><input type="checkbox" id="resAuto" ${r.auto?'checked':''}><span class="k"></span>Подхватывать новые подключения сами (в спокойное время, с проверкой)</label>
+   <label class="sw" style="margin-top:10px;display:flex"><input type="checkbox" id="resAuto" ${(RES_DRAFT?RES_DRAFT.auto:r.auto)?'checked':''}><span class="k"></span>Подхватывать новые подключения сами (в спокойное время, с проверкой)</label>
    <div class="tools" style="margin-top:10px"><button class="btn pri" id="resSave">Сохранить резерв</button></div>`:'<div class="note">Подключений WireGuard / прокси / OpenVPN на роутере не найдено. Добавьте их в Keenetic: «Интернет» → «Другие подключения».</div>'}
-   <div id="resOut" class="note" style="margin-top:8px"></div>
+   <div id="resOut" class="note" style="margin-top:8px">${RES_DRAFT?'<span class="m">Есть несохранённые изменения — нажмите «Сохранить резерв».</span>':''}</div>
    <div class="note" style="margin-top:6px">Если загрузить в Keenetic новый файл в то же подключение (например, новый .conf в Wireguard0), резерв продолжит работать сам — привязка идёт к подключению, а не к файлу.</div></div>
 
   <div class="card" data-st="xray"><h3>Базы сайтов (geosite / geoip)<span class="r">${esc(m.xray||'')}</span></h3>
@@ -1260,7 +1280,7 @@ async function openServerPicker(gtag){
 
 // ================= ПОДКЛЮЧЕНИЯ KEENETIC В СТОРОЖЕ =================
 var TUN=null;
-async function loadTunnels(){try{TUN=await api('/api/tunnels')}catch(e){}if(page==='watch')renderPage()}
+async function loadTunnels(){try{TUN=await api('/api/tunnels');try{TUN.auto=!!(await api('/api/reserve')).auto}catch(e){}}catch(e){}if(['watch','net','home'].includes(page))renderPage()}
 loadTunnels();setInterval(()=>{if(['watch','tools','home','net'].includes(page))loadTunnels()},30000);
 function tunnelCard(){
   if(!TUN||!(TUN.tunnels||[]).length)return '';
@@ -1273,7 +1293,7 @@ function tunnelCard(){
       <td class="c-chk"><div class="chk">${chips}</div></td><td class="c-spd mono">${spd}<div class="n" style="font-size:11px">Мбит/с</div></td><td class="c-sc">${scoreHTML(sc)}</td></tr>`}).join('');
   return `<div class="card"><h3>🛟 Подключения Keenetic<span class="r">${TUN.off?'проверка выключена':'каждые '+(TUN.every||60)+' с'} · <button class="btn sm" data-tunall="1">⇩ Взять все в резерв</button> <button class="btn sm" data-tuncheck="1">⚡ Проверить сейчас</button></span></h3>
    <table class="t wt"><thead><tr><th>Подключение</th><th>Сервисы</th><th>Скорость</th><th>Баллы</th></tr></thead><tbody>${rows}</tbody></table>
-   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — в «Сеть → Резерв»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
+   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — переключателями в «Сеть → Подключения»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
 
 // ================= ОБРЫВЫ ИНТЕРНЕТА =================
 var PULSE=null;
@@ -1572,7 +1592,7 @@ async function maybeWizard(){try{const r=await api('/api/wizard');if(!r.done&&!r
 <script>
 "use strict";
 // ================= 2.3: режим интерфейса =================
-const isExpert=()=>store.get('uiMode','simple')==='expert';
+const isExpert=()=>true; // единый режим: всё сложное разложено по вкладкам
 const qh=t=>`<span class="qhelp" title="${esc(t)}">?</span>`;
 
 // ================= СЕТЬ =================
@@ -1584,25 +1604,36 @@ function renderNet(){const el=$('#p-net');
 function loadCard(){const a=ABOUT||{};const g=a.guard||{};
   const lv=['<span class="g">спокойно</span>','<span class="m">занят — фоновые проверки реже</span>','<span class="b">перегружен — только самое нужное</span>'][g.level||0];
   return `<div class="card"><h3>Нагрузка роутера ${qh('Если роутер занят (нагрузка выше двух на ядро), панель реже проверяет серверы и откладывает полную проверку. Большие базы сайтов не загружаются, если мало свободной памяти.')}</h3>
-    <div class="kv"><div><span>Сейчас</span><b>${lv}</b></div><div><span>Нагрузка</span><b class="mono">${g.load1!=null?g.load1.toFixed(2):'—'} · ядер ${g.cores||'—'}</b></div>
+    <div class="kv"><div><span>Сейчас</span><b>${lv}</b></div>
     <div><span>Свободно памяти</span><b class="mono">${g.availMB>=0?g.availMB+' МБ':'—'}</b></div><div><span>Притормаживали</span><b class="mono">${g.slowed||0} раз</b></div></div>
     ${g.last?`<div class="note" style="margin-top:6px">${esc(g.last)}</div>`:''}</div>`}
-function updCard(){const a=ABOUT||{};
-  return `<div class="grid g2"><div class="card"><h3>Обновления ${qh('Панель сама проверяет новую версию на GitHub через минуту после запуска и затем каждые 6 часов — сначала через рабочий VPN-сервер, если не вышло — напрямую.')}</h3>${updBlock()}
-    <details style="margin-top:12px"><summary class="note" style="cursor:pointer">Установить из файла (если GitHub недоступен)</summary>
-    <div class="note" style="margin:8px 0">Выберите архив xray-selector.tar.gz — панель возьмёт нужный файл, проверит его на роутере и перезапустится. SSH не нужен.</div>
-    <div class="tools"><input type="file" id="updFile" accept=".gz,.tgz" class="in"><button class="btn" id="updBtn">Установить из файла</button></div><div id="updOut" class="note" style="margin-top:8px"></div></details></div>
-  <div class="card"><h3>О программе</h3>
-    <div class="kv"><div><span>Название</span><b>${esc(a.name||'xray-selector')}</b></div><div><span>Версия</span><b class="mono">${esc(a.version||(S&&S.version)||'')}</b></div><div><span>Автор</span><b>${esc(a.author||'Злобыч')}</b></div></div>
-    <div class="note" style="margin-top:8px">${esc(a.desc||'')}</div>
-    <div class="tools" style="margin-top:8px">${a.projectURL?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(a.projectURL)}">Страница проекта ↗</a>`:''}${a.supportURL?`<a class="lnk" target="_blank" rel="noopener" href="${esc(a.supportURL)}" style="font-size:13px">♥ Сказать спасибо разработчику</a>`:''}</div></div></div>`}
+function updCard(){const a=ABOUT||{},u=UPD;const cur=a.version||(S&&S.version)||'';
+  let st;
+  if(!u)st='<span class="n">…</span>';
+  else if(!u.repo)st='<span class="n">проверка обновлений включится после публикации на GitHub</span>';
+  else if(u.newer)st=`<span class="g"><b>доступна версия ${esc(u.latest)}</b></span>`;
+  else if(u.err)st=`<span class="b">не удалось проверить: ${esc(u.err)}</span>`;
+  else st=u.checked?`<span class="g">✓ установлена последняя версия</span> <span class="n">· проверено ${ago(u.checked)}</span>`:'<span class="n">ещё не проверялось</span>';
+  const notes=u&&u.newer&&u.notes?String(u.notes).replace(/```[a-z]*\n?/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').trim():'';
+  return `<div class="card"><h3>Xray Selector <span class="mono">${esc(cur)}</span> <span class="note" style="font-weight:400">· автор ${esc(a.author||'Злобыч')}</span>
+     ${qh('Панель сама проверяет новую версию на GitHub через минуту после запуска и затем каждые 6 часов.')}</h3>
+    <div class="note" style="margin-bottom:6px">${esc(a.desc||'')}</div>
+    <div style="margin:8px 0">${st}</div>
+    ${notes?`<div class="note" style="white-space:pre-wrap;max-height:160px;overflow:auto;margin-bottom:8px">${esc(notes)}</div>`:''}
+    <div class="tools">${u&&u.newer&&u.canInstall?`<button class="btn pri" id="updInstall">Установить ${esc(u.latest)}</button>`:''}<button class="btn" id="updCheck">Проверить обновления</button>
+      ${a.projectURL?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(a.projectURL)}">Страница проекта ↗</a>`:''}
+      ${a.supportURL?`<a class="lnk" target="_blank" rel="noopener" href="${esc(a.supportURL)}" style="font-size:13px">♥ Сказать спасибо разработчику</a>`:''}</div>
+    <details style="margin-top:12px"><summary class="note" style="cursor:pointer">Ещё</summary>
+      <div class="tools" style="margin:8px 0"><button class="btn sm" id="wzAgain">🧭 Пройти мастер заново</button></div>
+      <div class="note" style="margin:8px 0">Установить из файла (если GitHub недоступен): выберите архив xray-selector.tar.gz — панель проверит его и перезапустится.</div>
+      <div class="tools"><input type="file" id="updFile" accept=".gz,.tgz" class="in"><button class="btn" id="updBtn">Установить из файла</button></div><div id="updOut" class="note" style="margin-top:8px"></div></details></div>`}
 function refreshUpdCard(){const c=$('#updCardWrap');if(c&&!c.contains(document.activeElement))c.innerHTML=updCard()}
 function maintExtra(){const a=ABOUT||{};const g=a.guard||{};
   const lv=['<span class="g">спокойно</span>','<span class="m">занят — фоновые проверки реже</span>','<span class="b">перегружен — только самое нужное</span>'][g.level||0];
   return `<div class="grid g2">
   ${a.xkeenUI?`<div class="card" data-st="xray"><h3>XKeen UI</h3><div class="row"><span>Найдена XKeen UI</span><a class="btn sm" target="_blank" rel="noopener" href="${location.protocol}//${location.hostname}:${a.xkeenUIPort||1000}/">открыть ↗</a></div>
     <div class="banner" style="margin-top:8px">Не меняйте серверы и правила в двух панелях одновременно — одна перепишет изменения другой.</div></div>`:''}
-  ${isExpert()?`<div class="card" data-st="xray"><h3>Конфиги Xray (JSON) <span class="tag m">экспертный режим</span></h3>
+  ${isExpert()?`<div class="card" data-st="xray"><h3>Конфиги Xray (JSON)</h3>
     <div class="note" style="margin-bottom:8px">Правка файлов в ${esc('/opt/etc/xray/configs')}. Перед записью — проверка <code>xray -test</code>, резервная копия, перезапуск; если Xray не поднимется за 30 с — откат.</div>
     <div class="tools"><button class="btn" id="xcfgOpen">Открыть редактор</button></div></div>`:''}
   </div>`;
@@ -1626,10 +1657,7 @@ function updBlock(){const u=UPD;if(!u)return '<div class="note">…</div>';
 // ================= Режим интерфейса (в Настройках → Основные) =================
 const _origRS2=renderSettings;
 renderSettings=function(){const el=$('#p-settings');if(el.contains(document.activeElement)&&['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;
-  _origRS2();{let u=$('#updCardWrap');if(!u){u=document.createElement('div');u.id='updCardWrap';u.dataset.st='main';el.appendChild(u)}u.innerHTML=updCard()}let c=$('#modeCard');if(!c){c=document.createElement('div');c.id='modeCard';c.dataset.st='main';const pw=$('#pwCard');pw?pw.after(c):el.prepend(c)}
-  c.innerHTML=`<div class="card"><h3>Режим интерфейса</h3><div class="tools"><div class="seg">${[['simple','Простой'],['expert','Экспертный']].map(([k,t])=>`<button data-uimode="${k}" class="${store.get('uiMode','simple')===k?'on':''}">${t}</button>`).join('')}</div></div>
-   <div class="tools" style="margin-top:10px"><button class="btn" id="wzAgain">🧭 Пройти мастер заново</button></div>
-   <div class="note" style="margin-top:8px">Простой режим прячет тонкие настройки сторожа, технические журналы и служебные карточки. Экспертный показывает всё, плюс правку JSON-конфигов Xray. Запоминается на этом устройстве.</div></div>`;
+  _origRS2();{let u=$('#updCardWrap');if(!u){u=document.createElement('div');u.id='updCardWrap';u.dataset.st='main';el.appendChild(u)}u.innerHTML=updCard()}
   filterCards(el)};
 
 // ================= Редактор JSON-конфигов =================
@@ -1778,7 +1806,7 @@ document.addEventListener('keydown',e=>{if(e.target.id==='lgQ'&&(e.key==='Escape
 applyTheme(); renderNav(); go(location.hash.length>1?decodeURIComponent(location.hash.slice(1)):pageKey); window.addEventListener('hashchange',()=>{if(location.hash.length>1)go(decodeURIComponent(location.hash.slice(1)))}); loadAbout(); loadUpd(); setInterval(loadAbout,60000); setInterval(loadUpd,600000);
 matchMedia('(max-width:900px)').addEventListener('change',()=>{applyTheme();renderPage()});
 maybeWizard();
-(async function poll(){await loadState();setTimeout(poll,S&&(S.testing.length||(W&&W.running))?1500:5000)})();
+(async function poll(){await loadState(true);setTimeout(poll,S&&(S.testing.length||(W&&W.running))?1500:5000)})();
 (function pm(){loadMetrics();setTimeout(pm,page==='home'?2000:10000)})();
 loadTraffic();setInterval(loadTraffic,30000);
 loadFlow();setInterval(()=>{if(page==='map')loadFlow()},10000);

@@ -494,6 +494,10 @@ func (a *app) handleRules(w http.ResponseWriter, r *http.Request) {
 		absorbable := 0
 		if file, err := findRoutingFile(*flagConfDir); err == nil {
 			if b, err := os.ReadFile(file); err == nil {
+				// счётчик «можно разнести» считает ровно то, что реально перенесёт absorb
+				if _, plan, err := a.absorbTextWith(string(b), a.serverSet()); err == nil {
+					absorbable = len(plan.Moved)
+				}
 				if rules, _, err := parseRulesX(string(b)); err == nil {
 					servers := a.serverSet()
 					for i, rr := range rules {
@@ -505,9 +509,6 @@ func (a *app) handleRules(w http.ResponseWriter, r *http.Request) {
 							e := map[string]any{"rule": i, "entry": x, "kind": k}
 							if id := matchSvc(x); id != "" {
 								byService[id] = append(byService[id], e)
-								if (k == "vpn" || k == "direct") && len(rr.Source) == 0 && len(rr.Port) == 0 {
-									absorbable++
-								}
 							} else if !isPrivateEntry(x) {
 								custom = append(custom, e)
 							}
