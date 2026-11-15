@@ -60,9 +60,9 @@ function renderMetrics(){
   const box=$('#metCards'); if(!box) return; const m=MET; const P=(m&&m.points)||[]; const last=P[P.length-1]||{};
   const memMB=last.mem?Math.round(last.mem/1024):0, totMB=m&&m.memTotal?Math.round(m.memTotal/1024):0;
   const cards=[
-    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?(()=>{const l=parseFloat(String(m.load).split(/\s+/)[0])||0,c=m.cores||1,r=l/c;return (r<0.7?'роутер спокоен':r<1.5?'роутер занят':'роутер перегружен')+' · очередь '+l.toFixed(2)+' на '+c+' яд.'})():'',P.map(p=>p.cpu),'#a78bfa'],
+    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?(()=>{const l=parseFloat(String(m.load).split(/\s+/)[0])||0,c=m.cores||1,r=l/c;return (r<0.7?'роутер справляется легко':r<1.5?'роутер заметно занят':'роутер перегружен')})():'',P.map(p=>p.cpu),'#a78bfa'],
     ['Память',totMB?totMB+' МБ':'',`${memMB||'—'}<small>МБ · ${totMB?Math.round(memMB*100/totMB):'—'}%</small>`,last.xrayM?'Xray: '+Math.round(last.xrayM/1024)+' МБ':'',P.map(p=>p.mem),'#22d3ee'],
-    ['Интернет'+(m&&m.iface?' · '+m.iface:''),`↑ ${last.tx??'—'}`,`↓ ${last.rx??'—'}<small>Мбит/с</small>`,'вход и выход за час',P.map(p=>p.rx),'#34d399',P.map(p=>p.tx)],
+    ['Интернет'+(m&&m.iface?' · '+m.iface:''),`↑ ${last.tx??'—'}`,`↓ ${last.rx??'—'}<small>Мбит/с</small>`,'↓ скачивание · ↑ отдача, график за час',P.map(p=>p.rx),'#34d399',P.map(p=>p.tx)],
     m&&m.hasTemp?['Температура','',`${last.temp?last.temp.toFixed(0):'—'}<small>°C</small>`,'датчик роутера',P.map(p=>p.temp),'#fbbf24']
       :['Xray (память)','',`${last.xrayM?Math.round(last.xrayM/1024):'—'}<small>МБ</small>`,'датчика температуры нет',P.map(p=>p.xrayM),'#fbbf24'],
   ];
@@ -79,7 +79,7 @@ function trafficBlock(){
   const t=TRF.today||{}; const names=(S&&S.devNames)||{};
   const top=(o,n,lab)=>Object.entries(o||{}).map(([k,v])=>[k,(v.up||0)+(v.down||0),v.conns||0]).filter(x=>x[1]||x[2]).sort((a,b)=>(b[1]-a[1])||(b[2]-a[2])).slice(0,n);
   const svc=top(t.services,10); const mx=Math.max(1,...svc.map(x=>x[1]||x[2])); const totB=Object.values(t.services||{}).reduce((a,v)=>a+(v.up||0)+(v.down||0),0)||1;
-  let warn=''; if(!TRF.statsConfigured) warn=`<div class="banner" style="margin-bottom:10px">Точный трафик по серверам выключен в Xray. <span class="lnk" data-go="settings">Включить в настройках →</span></div>`;
+  let warn=''; if(!TRF.statsOK) warn=`<div class="note" style="margin-bottom:10px">Трафик по серверам начнёт считаться после ближайшего перезапуска Xray.</div>`;
   if(TRF.ctErr) warn+=`<div class="note" style="margin-bottom:8px">По устройствам: ${esc(TRF.ctErr)}</div>`;
   return warn+`<div>${svc.map(([k,b,c])=>{const ip=k==='по IP-адресу';return `<div style="display:grid;grid-template-columns:minmax(110px,170px) 1fr 74px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b class="${ip?'n':''}">${esc(ip?'прочие (только IP)':k)}</b><div class="note">${c} соед.</div></div><div class="prog"><i style="width:${Math.round((b||c)*100/mx)}%"></i></div><div class="mono" style="text-align:right">${b?gb(b):'—'}<div class="note">${b?Math.round(b*100/totB)+'%':''}</div></div></div>`}).join('')||'<div class="note">пока нет данных</div>'}</div><div class="note" style="margin-top:8px">Сервис определяется по имени сайта, а приложения, которые ходят сразу по IP (Telegram, звонки, игры), — по известным диапазонам и по спискам из раздела «Правила».</div>`;
 }
@@ -204,18 +204,18 @@ function renderDrawer(d){
 
 <script>
 function homeProviders(){const w=TRF&&TRF.wans||[];const by=TRF&&TRF.ispBy||{};
-  if(!w.length){const isp=TRF&&TRF.isp||[];return `<div class="card"><h3>Интернет провайдера · 24 часа<span class="r">${isp.length&&isp[isp.length-1].ok?'пинг сейчас '+isp[isp.length-1].ms+' мс':''}</span></h3><div class="bar" style="height:12px">${ispBar(isp)}</div></div>`}
-  return `<div class="card"><h3>Подключения<span class="r">провайдеры — связь с Яндексом раз в минуту · VPN — проверка сервисов</span></h3><div class="note" style="margin:2px 0 4px;font-weight:600">Провайдеры · 24 часа</div>${w.map(x=>{const l=by[x.name]||[],last=l[l.length-1],bad=l.filter(p=>!p.ok).length;
-    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id)}</b> <span class="tag ${x.role==='основной'?'a':''}">${esc(x.role||'')}</span>${x.active?' <span class="tag g">● активен</span>':''}<div class="note">${esc(x.id)} · ${esc(x.name)}${x.ip?' · '+esc(x.ip):''} · приоритет ${x.prio}</div></div>
+  if(!w.length){const isp=TRF&&TRF.isp||[];return `<div class="card"><h3>Интернет провайдера · 24 часа<span class="r">${isp.length&&isp[isp.length-1].ok?'пинг сейчас '+isp[isp.length-1].ms+' мс':''}</span></h3><div class="bar" style="height:12px">${ispBar(isp)}</div>${connVPN()}</div>`}
+  return `<div class="card"><h3>Подключения</h3><div class="note" style="margin:2px 0 4px;font-weight:600">Провайдеры · 24 часа</div>${w.map(x=>{const l=by[x.name]||[],last=l[l.length-1],bad=l.filter(p=>!p.ok).length;
+    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id)}</b> <span class="tag ${x.role==='основной'?'a':''}">${esc(x.role||'')}</span>${x.active?' <span class="tag g">● активен</span>':''}</div>
       <div class="bar" style="height:12px">${ispBar(l)}</div><div class="mono ${!last?'n':last.ok?'g':'b'}" style="white-space:nowrap">${!last?'—':last.ok?last.ms+' мс':'нет связи'}${bad?` <span class="m">· ${bad} сбоев</span>`:''}</div></div>`}).join('')}${connVPN()}</div>`}
 // VPN и прокси Keenetic (WireGuard, Proxy…) — внутри блока «Подключения»
 function connVPN(){const l=(typeof TUN!=='undefined'&&TUN&&TUN.tunnels)||[];
-  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси Keenetic не проверяются. Отметьте их в «Сеть → Резерв», чтобы видеть здесь, работают ли они.</div>`;
-  return `<div class="note" style="margin:12px 0 4px;font-weight:600">VPN и прокси Keenetic</div>${l.map(r=>{const x=r.iface,h=r.health;
+  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси в Keenetic не найдены. Добавьте WireGuard, OpenVPN или прокси в Keenetic («Интернет» → «Другие подключения») — они появятся здесь, и их можно будет взять в резерв.</div>`;
+  return `<div class="note" style="margin:12px 0 4px"><b>VPN и прокси Keenetic</b> · переключатель — резерв: если не работает ни один сервер подписки, панель перейдёт на отмеченное подключение</div>${l.map(r=>{const x=r.iface,h=r.health;
     const okN=h&&h.targets?Object.values(h.targets).filter(t=>t.ok).length:0,all=h&&h.targets?Object.keys(h.targets).length:0;
-    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id||x.name)}</b>${r.inReserve?' <span class="tag">в резерве</span>':''}${TUN.active===x.tag?' <span class="tag g">● сейчас через него</span>':''}<div class="note">${esc(x.type)} · ${esc(x.id||x.name)}</div></div>
+    return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><label class="sw" style="display:inline-flex;vertical-align:middle;margin-right:6px" title="Резерв: переключаться сюда, если не работает ни один сервер подписки"><input type="checkbox" class="tunRes" value="${esc(x.name)}" ${r.inReserve?'checked':''}><span class="k"></span></label><b>${esc(x.desc||x.id||x.name)}</b>${TUN.active===x.tag?' <span class="tag g">● сейчас через него</span>':''}<div class="note">${esc(x.type)} · ${esc(x.id||x.name)}</div></div>
       <div class="note">${!h||!h.t?'ещё не проверялось':h.ok?`<span class="g">✓ работает</span> · сервисы ${okN}/${all}${h.speedKbps?' · '+mbps(h.speedKbps)+' Мбит/с':''}`:`<span class="b">✕ ${esc(h.reason||'не открывает сервисы')}</span>`}</div>
-      <div class="mono ${!h||!h.t?'n':h.ok?'g':'b'}" style="white-space:nowrap" title="отклик сервисов через это подключение (медиана)">${(()=>{const ms=h&&h.targets?Object.values(h.targets).filter(t=>t.ok&&t.ms).map(t=>t.ms).sort((a,b)=>a-b):[];return ms.length?ms[ms.length>>1]+' мс':'—'})()}</div></div>`}).join('')}`}
+      <div class="mono ${!h||!h.t?'n':h.ok?'g':'b'}" style="white-space:nowrap" title="отклик сервисов через это подключение (медиана)">${(()=>{const ms=h&&h.targets?Object.values(h.targets).filter(t=>t.ok&&t.ms).map(t=>t.ms).sort((a,b)=>a-b):[];return ms.length?ms[ms.length>>1]+' мс':'—'})()}</div></div>`}).join('')}<label class="sw" style="display:flex;margin-top:10px"><input type="checkbox" id="tunAuto" ${TUN.auto?'checked':''}><span class="k"></span>Брать в резерв новые подключения автоматически (с проверкой)</label>`}
 function homeTunnels(){if(typeof TUN==='undefined'||!TUN||!(TUN.tunnels||[]).length)return '';
   return `<div class="card"><h3>🛟 Резервные подключения Keenetic<span class="r lnk" data-go="watch">подробнее →</span></h3><div class="grid g3">${TUN.tunnels.map(r=>{const x=r.iface,h=r.health,sc=r.score;
     const okN=h&&h.targets?Object.values(h.targets).filter(t=>t.ok).length:0,all=h&&h.targets?Object.keys(h.targets).length:0;

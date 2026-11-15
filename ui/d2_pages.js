@@ -169,7 +169,7 @@ function renderSettings(){const el=$('#p-settings');if(el.contains(document.acti
   const st=W.settings||{}; const th=store.get('theme','xrock'), fx=store.get('fx','auto');
   const tgOK=st.tgToken&&st.tgChatID;
   el.innerHTML=`
-  <div class="card" data-st="main"><h3>Оформление</h3><div class="tools"><span class="note">Тема:</span><div class="seg">${[['xrock','Ночная'],['srm','Светлая (SRM)']].map(([k,t])=>`<button data-settheme="${k}" class="${th===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card" data-st="main"><h3>Оформление</h3><div class="tools"><span class="note">Тема:</span><div class="seg">${[['xrock','Тёмная'],['srm','Светлая']].map(([k,t])=>`<button data-settheme="${k}" class="${th===k?'on':''}">${t}</button>`).join('')}</div>
    <span class="note" style="margin-left:14px">Эффекты:</span><div class="seg">${[['auto','Авто'],['full','Полные'],['lite','Лёгкие']].map(([k,t])=>`<button data-fx="${k}" class="${fx===k?'on':''}">${t}</button>`).join('')}</div></div>
    <div class="note" style="margin-top:8px">«Авто»: на компьютере — живой фон, стекло, 3D-наклон карточек и частицы на карте; на телефоне — лёгкая версия. Тема и эффекты запоминаются на каждом устройстве отдельно.</div></div>
   <div class="card" data-st="watch"><h3>Настройки сторожа</h3><div class="fg">
@@ -210,12 +210,8 @@ function renderSettings(){const el=$('#p-settings');if(el.contains(document.acti
     <label class="full"><span class="sw"><input type="checkbox" id="pinOn" ${st.tgPinStatus?'checked':''}><span class="k"></span>Закреплённый «живой» статус в группе</span></label>
     <label class="full"><span class="sw"><input type="checkbox" id="clOn" ${st.tgCleanGroup?'checked':''}><span class="k"></span>Удалять в группе /status и ответ через минуту</span></label>
    </div><div class="tools" style="margin-top:10px"><button class="btn pri" id="sSave2">Сохранить</button></div></div>
-  <div class="card x-exp" data-st="main"><h3>Трафик</h3><div class="note" style="margin-bottom:10px">Точные гигабайты по серверам считает сам Xray — для этого в его конфиг нужно добавить статистику (программа сделает это сама, с резервной копией) и перезапустить Xray. По устройствам — по счётчикам соединений роутера: ${TRF?(TRF.ctOK?'<span class="g">работает</span>':'<span class="m">'+esc(TRF.ctErr||'нет данных')+'</span>'):'…'}.</div>
-   <div class="tools">${TRF&&TRF.statsConfigured?`<span class="tag g">✓ статистика Xray включена${TRF.statsOK?'':' — ждёт перезапуска Xray'}</span>`:'<button class="btn pri" id="enStats">Включить точный трафик по серверам</button>'}
-   ${TRF&&TRF.tgRoute?'<span class="tag g">✓ адреса Telegram идут через VPN</span>':'<button class="btn" id="enTgRoute">Пустить адреса Telegram через VPN</button>'}</div></div>
   <div class="card" data-st="main"><h3>Резервная копия настроек</h3><div class="note" style="margin-bottom:10px">Сторож, мёртвые серверы, бот, настройки и имена устройств — одним файлом.</div>
-   <div class="tools"><a class="btn" href="/api/backup" download>⬇ Скачать копию</a><label class="btn">⬆ Восстановить из файла<input type="file" id="restoreFile" accept=".json" style="display:none"></label></div></div>
-  <div class="card" data-st="main"><h3>Приложение на телефоне</h3><div class="note" style="line-height:1.6">iPhone: откройте эту страницу в Safari → «Поделиться» → <b>«На экран Домой»</b>. Компьютер (Chrome/Edge): значок «Установить» в адресной строке. Панель откроется как отдельное приложение со своей иконкой.</div></div>`;
+   <div class="tools"><a class="btn" href="/api/backup" download>⬇ Скачать копию</a><label class="btn">⬆ Восстановить из файла<input type="file" id="restoreFile" accept=".json" style="display:none"></label></div></div>`;
   $('#tgEv').value=st.tgEvents==='off'?'off':(st.tgLevel||'important');
   filterCards(el);
 }

@@ -13,7 +13,7 @@ const winSec=()=>21600, winTxt=()=>'6 ч';
 
 // ---------- тема и эффекты ----------
 function applyTheme(){
-  document.body.classList.toggle('simple',store.get('uiMode','simple')!=='expert');
+  document.body.classList.remove('simple');
   let t=store.get('theme','xrock');if(t==='unifi'){t='xrock';store.set('theme',t)} document.documentElement.dataset.theme=t;
   const fxPref=store.get('fx','auto'); const full=fxPref==='full'||(fxPref==='auto'&&!isMobile()&&matchMedia('(pointer:fine)').matches);
   document.body.classList.toggle('fx',full);
@@ -61,7 +61,7 @@ document.addEventListener('mousemove',e=>{if(!fxOn())return;const c=e.target.clo
 // Ключ вкладки: «страница» или «страница:фильтр». Страница — это <section id="p-…">.
 const SECS=[['home','◉','Обзор'],['watch','🛡','Сторож',[['watch','Обзор'],['settings:watch','Настройки']]],['servers','☰','Серверы'],
   ['devices','📱','Устройства',[['devices','Список'],['map','Карта']]],
-  ['sites','🌐','Правила'],['net','📶','Сеть',[['net','Состояние'],['tools:reserve','Резерв']]],
+  ['sites','🌐','Правила'],['net','📶','Сеть'],
   ['logs','🗒','Журнал',[['events','События'],['logs:access','Xray'],['logs:keenetic','Роутер'],['logs:selector','Программа']]],
   ['settings','⚙','Настройки',[['settings:main','Основные'],['settings:tg','Telegram'],['tools:sub','Подписка'],['tools:xray','Xray'],['settings:pw','Пароль']]]];
 const PAGES=SECS; // совместимость со старым кодом
@@ -98,6 +98,7 @@ function go(p){
   if(page==='logs') syncLogTab();
   renderNav(); renderPage(); window.scrollTo(0,0); if(typeof renderSiteBar==='function')renderSiteBar();
   if(page==='logs') loadLogs(); if(page==='sites'){loadSites();loadRules()} if(page==='tools') loadTools(); if(page==='devices'){loadDevices();typeof loadRules==='function'&&loadRules()} if(page==='map') loadFlow(); if(page==='events') markRead();
+  if(page==='settings'&&typeof loadRules==='function'&&!RUL)loadRules().then(()=>{if(page==='settings')renderPage()});
   if(page==='net'){typeof loadDNS==='function'&&loadDNS();typeof loadPulse==='function'&&loadPulse()}
 }
 // показать только карточки текущей вкладки (data-st="…")
@@ -126,12 +127,16 @@ async function markRead(){if(!W||!W.events||!W.events.length)return;const last=W
 
 // ---------- опрос ----------
 let lastMetT=0;
-async function loadState(){
+async function loadState(bg){
   try{S=await api('/api/state');W=S.watch||{groups:{},health:{},events:[],settings:{}};}catch(e){$('#apiPill').innerHTML='<span class="dot bad"></span>панель недоступна';return}
   const ok=!S.apiError&&S.apiInConfig;
   $('#apiPill').innerHTML=`<span class="dot ${ok?'live':'bad'}"></span>${ok?'Xray онлайн · API':'Xray API недоступен'}`;
   $('#ver').textContent=S.version.replace(/\.0$/,'');
-  renderBell(); renderNav(); renderPage();
+  renderBell(); renderNav();
+  // фоновый опрос не перерисовывает страницы с формами (настройки, подписка, резерв, Xray):
+  // иначе прыгает экран и сбрасываются переключатели. Они обновляются при переходе и после «Сохранить».
+  if(bg&&(page==='settings'||page==='tools'))return;
+  renderPage();
 }
 async function loadMetrics(){
   try{const m=await api('/api/metrics?since='+lastMetT);if(!MET||!lastMetT){MET=m}else{MET.points=MET.points.concat(m.points).slice(-1800);Object.assign(MET,{...m,points:MET.points})}

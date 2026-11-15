@@ -102,7 +102,7 @@ document.addEventListener('click',async e=>{
     try{const r=await api('/api/reserve',{check:n});o.innerHTML=r.ok?'<span class="g">✓ сервисы открываются</span>':'<span class="b">✕ '+esc(r.why||'не открываются')+'</span>'}catch(err){o.textContent=err.message}return}
   if(t=T('#resSave')){const ifaces=[...document.querySelectorAll('.resChk:checked')].map(x=>x.value);const out=$('#resOut');
     if(!confirm(ifaces.length?'Записать резерв в конфиг Xray? Xray перезапустится (5–10 с).':'Убрать резерв из конфига? Xray перезапустится.'))return;out.innerHTML='<span class="spin"></span>';
-    try{await api('/api/reserve',{ifaces,auto:$('#resAuto').checked});out.textContent='Готово';loadTools()}catch(err){out.textContent=err.message}return}
+    try{await api('/api/reserve',{ifaces,auto:$('#resAuto').checked});RES_DRAFT=null;out.textContent='Готово';loadTools()}catch(err){out.textContent=err.message}return}
   if(t=T('#geoUpd')){if(!confirm('Обновить базы geosite/geoip (xkeen -ug)? Займёт 1–5 минут, Xray перезапустится.'))return;const out=$('#geoOut');out.innerHTML='<span class="spin"></span> обновляю…';t.disabled=true;
     try{const r=await api('/api/maint',{action:'geo'});out.innerHTML=`<pre class="log" style="max-height:200px">${esc(r.output||'')}</pre>`;loadTools()}catch(err){out.textContent=err.message}t.disabled=false;return}
   if(t=T('#dnsNow')){t.disabled=true;t.textContent='проверяю…';await loadDNS(true);return}
@@ -123,6 +123,25 @@ function planHTML(p){if(!p)return'';const l=(a,n)=>a&&a.length?`<div class="note
 let TOOLS=null;
 function fmtLeftJS(sec){return sec<86400?Math.round(sec/3600)+' ч':Math.round(sec/86400)+' дн'}
 async function loadTools(){try{const [m,s,r]=await Promise.all([api('/api/maint'),api('/api/sub'),api('/api/reserve')]);TOOLS={m,s,r}}catch(e){TOOLS={error:e.message}}if(page==='tools')renderTools()}
+// черновик резерва: пока не нажато «Сохранить», переключатели не сбрасываются при обновлении страницы
+let RES_DRAFT=null;
+// резерв прямо в «Подключениях»: каждый переключатель сохраняется сразу
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.matches('.tunRes')){const nm=t.value,on=t.checked,row=(TUN&&TUN.tunnels||[]).find(r=>r.iface.name===nm);const title=row?(row.iface.desc||row.iface.id||nm):nm;
+    if(!confirm((on?'Взять «'+title+'» в резерв?':'Убрать «'+title+'» из резерва?')+' Xray перезапустится, связь пропадёт на 5–10 секунд.')){t.checked=!on;return}
+    const list=(TUN.tunnels||[]).filter(r=>r.iface.name===nm?on:r.inReserve).map(r=>r.iface.name);
+    try{await api('/api/reserve',{ifaces:list});if(row)row.inReserve=on;toast(on?'Добавлено в резерв':'Убрано из резерва');loadTunnels()}catch(err){t.checked=!on;alert(err.message)}return}
+  if(t.id==='tunAuto'){const v=t.checked;try{await api('/api/reserve',{auto:v});if(TUN)TUN.auto=v;toast(v?'Новые подключения будут браться в резерв сами':'Автоподхват выключен')}catch(err){t.checked=!v;toast(err.message)}}});
+// состояние подключения: Keenetic «поднято» ещё не значит, что через него открываются сервисы
+function resStatus(i){if(!i.up)return '<span class="b">не подключено</span>';
+  const t=(typeof TUN!=='undefined'&&TUN&&TUN.tunnels||[]).find(x=>x.iface&&x.iface.name===i.name);const h=t&&t.health;
+  if(!h||!h.t)return '<span class="g">подключено</span> · <span class="n">сервисы ещё не проверялись</span>';
+  return h.ok?'<span class="g">подключено · сервисы открываются</span>':'<span class="m">подключено, но сервисы не открываются</span>'+(h.reason&&!/не открыва/.test(h.reason)?' <span class="n">('+esc(h.reason)+')</span>':'')}
+document.addEventListener('change',async e=>{if(e.target.matches('#resAuto')){const v=e.target.checked;
+    try{await api('/api/reserve',{auto:v});if(TOOLS&&TOOLS.r)TOOLS.r.auto=v;if(RES_DRAFT)RES_DRAFT.auto=v;toast(v?'Новые подключения будут подхватываться сами':'Автоподхват выключен')}catch(err){e.target.checked=!v;toast(err.message)}return}
+  if(!e.target.matches('.resChk'))return;
+  RES_DRAFT={ifaces:new Set([...document.querySelectorAll('.resChk:checked')].map(x=>x.value)),auto:!!($('#resAuto')&&$('#resAuto').checked)};
+  const o=$('#resOut');if(o)o.innerHTML='<span class="m">Есть несохранённые изменения — нажмите «Сохранить резерв».</span>'});
 function renderTools(){
   const el=$('#p-tools'); if(el.contains(document.activeElement)&&['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;
   if(!TOOLS){el.innerHTML='<div class="card empty"><span class="spin"></span></div>';return}
@@ -147,12 +166,12 @@ function renderTools(){
 
   <div class="card" data-st="reserve"><h3>Резерв через подключения Keenetic</h3>
    <div class="note" style="margin-bottom:8px">Если ни один сервер подписки не работает (провайдер режет всё), сторож по очереди проверит отмеченные подключения роутера — WireGuard, прокси, OpenVPN — и переключится на первое рабочее. Когда серверы оживут, вернётся на них.</div>
-   ${(r.ifaces||[]).length?`<table class="t">${r.ifaces.map(i=>{const on=(r.configured||[]).some(c=>c.iface===i.name);return `<tr><td><label class="sw"><input type="checkbox" class="resChk" value="${esc(i.name)}" ${on?'checked':''}><span class="k"></span></label></td>
-     <td><b>${esc(i.type)} · ${esc(i.id||i.name)}</b>${i.desc?` <span class="note">${esc(i.desc)}</span>`:''}<div class="note">${esc(i.name)} · ${i.up?'<span class="g">подключено</span>':'<span class="b">не подключено</span>'}${on?' · <span class="g">в резерве</span>':''}</div></td>
+   ${(r.ifaces||[]).length?`<table class="t">${r.ifaces.map(i=>{const on=RES_DRAFT?RES_DRAFT.ifaces.has(i.name):(r.configured||[]).some(c=>c.iface===i.name);return `<tr><td><label class="sw"><input type="checkbox" class="resChk" value="${esc(i.name)}" ${on?'checked':''}><span class="k"></span></label></td>
+     <td><b>${esc(i.type)} · ${esc(i.id||i.name)}</b>${i.desc?` <span class="note">${esc(i.desc)}</span>`:''}<div class="note">${resStatus(i)}${(r.configured||[]).some(c=>c.iface===i.name)?' · <span class="g">в резерве</span>':''}</div></td>
      <td><button class="btn sm" data-rescheck="${esc(i.name)}">Проверить</button><div class="note" id="rc_${esc(i.name)}"></div></td></tr>`}).join('')}</table>
-   <label class="sw" style="margin-top:10px;display:flex"><input type="checkbox" id="resAuto" ${r.auto?'checked':''}><span class="k"></span>Подхватывать новые подключения сами (в спокойное время, с проверкой)</label>
+   <label class="sw" style="margin-top:10px;display:flex"><input type="checkbox" id="resAuto" ${(RES_DRAFT?RES_DRAFT.auto:r.auto)?'checked':''}><span class="k"></span>Подхватывать новые подключения сами (в спокойное время, с проверкой)</label>
    <div class="tools" style="margin-top:10px"><button class="btn pri" id="resSave">Сохранить резерв</button></div>`:'<div class="note">Подключений WireGuard / прокси / OpenVPN на роутере не найдено. Добавьте их в Keenetic: «Интернет» → «Другие подключения».</div>'}
-   <div id="resOut" class="note" style="margin-top:8px"></div>
+   <div id="resOut" class="note" style="margin-top:8px">${RES_DRAFT?'<span class="m">Есть несохранённые изменения — нажмите «Сохранить резерв».</span>':''}</div>
    <div class="note" style="margin-top:6px">Если загрузить в Keenetic новый файл в то же подключение (например, новый .conf в Wireguard0), резерв продолжит работать сам — привязка идёт к подключению, а не к файлу.</div></div>
 
   <div class="card" data-st="xray"><h3>Базы сайтов (geosite / geoip)<span class="r">${esc(m.xray||'')}</span></h3>
@@ -245,7 +264,7 @@ async function openServerPicker(gtag){
 
 // ================= ПОДКЛЮЧЕНИЯ KEENETIC В СТОРОЖЕ =================
 var TUN=null;
-async function loadTunnels(){try{TUN=await api('/api/tunnels')}catch(e){}if(page==='watch')renderPage()}
+async function loadTunnels(){try{TUN=await api('/api/tunnels');try{TUN.auto=!!(await api('/api/reserve')).auto}catch(e){}}catch(e){}if(['watch','net','home'].includes(page))renderPage()}
 loadTunnels();setInterval(()=>{if(['watch','tools','home','net'].includes(page))loadTunnels()},30000);
 function tunnelCard(){
   if(!TUN||!(TUN.tunnels||[]).length)return '';
@@ -258,7 +277,7 @@ function tunnelCard(){
       <td class="c-chk"><div class="chk">${chips}</div></td><td class="c-spd mono">${spd}<div class="n" style="font-size:11px">Мбит/с</div></td><td class="c-sc">${scoreHTML(sc)}</td></tr>`}).join('');
   return `<div class="card"><h3>🛟 Подключения Keenetic<span class="r">${TUN.off?'проверка выключена':'каждые '+(TUN.every||60)+' с'} · <button class="btn sm" data-tunall="1">⇩ Взять все в резерв</button> <button class="btn sm" data-tuncheck="1">⚡ Проверить сейчас</button></span></h3>
    <table class="t wt"><thead><tr><th>Подключение</th><th>Сервисы</th><th>Скорость</th><th>Баллы</th></tr></thead><tbody>${rows}</tbody></table>
-   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — в «Сеть → Резерв»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
+   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — переключателями в «Сеть → Подключения»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
 
 // ================= ОБРЫВЫ ИНТЕРНЕТА =================
 var PULSE=null;
