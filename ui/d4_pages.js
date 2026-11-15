@@ -31,7 +31,14 @@ function maintExtra(){const a=ABOUT||{};const g=a.guard||{};
 }
 
 let UPD=null;
-async function loadUpd(){try{UPD=await api('/api/update')}catch(e){}}
+async function loadUpd(){try{UPD=await api('/api/update')}catch(e){}updBanner()}
+function updBanner(){const el=$('#updBar');if(!el)return;const u=UPD;
+  if(!u||!u.newer||!u.canInstall||(ABOUT&&ABOUT.demo)||store.get('updLater','')===u.latest){el.innerHTML='';return}
+  const notes=String(u.notes||'').replace(/```[a-z]*\n?/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').trim();
+  el.innerHTML=`<div class="updbar"><h3>🔔 Внимание: обновление ${esc(u.latest)}</h3>
+   <div class="note">Сейчас установлена ${esc(u.current)}. Что нового:</div>
+   ${notes?`<div class="notes">${esc(notes)}</div>`:''}
+   <div class="tools"><button class="btn pri" id="updInstall">Установить ${esc(u.latest)}</button><button class="btn" id="updLater">Позже</button>${u.page?`<a class="lnk" target="_blank" rel="noopener" href="${esc(u.page)}">подробнее ↗</a>`:''}</div></div>`}
 function updBlock(){const u=UPD;if(!u)return '<div class="note">…</div>';
   if(!u.repo)return '<div class="note">Проверка обновлений включится, когда программа будет опубликована на GitHub. Пока обновляйте архивом выше.</div>';
   return `<div class="kv"><div><span>Сейчас</span><b class="mono">${esc(u.current)}</b></div><div><span>На GitHub</span><b class="mono ${u.newer?'g':''}">${esc(u.latest||'—')}</b></div></div>
@@ -65,10 +72,11 @@ async function openXcfg(){let l;try{l=await api('/api/xcfg')}catch(e){toast(e.me
       b.disabled=true;out.textContent='применяю…';try{await api('/api/xcfg',{name,content});orig=content;out.innerHTML='<span class="g">✓ Применено</span>'}catch(err){out.innerHTML='<span class="b">'+esc(err.message)+'</span>'}b.disabled=false}};
 }
 
-document.addEventListener('click',async e=>{const t=e.target.closest('[data-uimode],#xcfgOpen,#updCheck,#updInstall,#wzAgain');if(!t)return;
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-uimode],#xcfgOpen,#updCheck,#updInstall,#updLater,#wzAgain');if(!t)return;
+  if(t.id==='updLater'){store.set('updLater',UPD&&UPD.latest||'');updBanner();return}
   if(t.id==='wzAgain'){openWizard();return}
   if(t.id==='xcfgOpen'){openXcfg();return}
-  if(t.id==='updCheck'){t.disabled=true;t.textContent='проверяю…';try{UPD=await api('/api/update',{action:'check'})}catch(err){toast(err.message)}renderPage();return}
+  if(t.id==='updCheck'){t.disabled=true;t.textContent='проверяю…';try{UPD=await api('/api/update',{action:'check'})}catch(err){toast(err.message)}store.set('updLater','');updBanner();renderPage();return}
   if(t.id==='updInstall'){if(!confirm('Скачать и установить '+UPD.latest+'? Панель перезапустится.'))return;runPanelUpdate({github:true});return}
   store.set('uiMode',t.dataset.uimode);applyTheme();renderPage();toast(t.dataset.uimode==='expert'?'Экспертный режим':'Простой режим')});
 
