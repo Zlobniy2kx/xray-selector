@@ -85,6 +85,9 @@ func testChanges(changes []cfgChange) error {
 			return err
 		}
 	}
+	if err := checkXrayDeps(tmp); err != nil {
+		return err
+	}
 	return xrayTest(tmp)
 }
 

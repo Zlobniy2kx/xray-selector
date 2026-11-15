@@ -35,3 +35,22 @@ func TestRemoveTelegramRoute(t *testing.T) {
 		t.Fatal("still configured")
 	}
 }
+
+func TestRepairAPIDeps(t *testing.T) {
+	dir := t.TempDir()
+	st := filepath.Join(dir, "state.json")
+	flagState = &st
+	os.WriteFile(filepath.Join(dir, "06_policy.json"), []byte(`{"policy":{"system":{"statsOutboundUplink":true,"statsOutboundDownlink":true}}}`), 0644)
+	os.WriteFile(filepath.Join(dir, "07_api.json"), []byte(`{"api":{"tag":"api","services": ["RoutingService", "ObservatoryService", "StatsService"]}}`), 0644)
+	r := repairAPIDeps(dir)
+	b, _ := os.ReadFile(filepath.Join(dir, "07_api.json"))
+	if strings.Contains(string(b), "ObservatoryService") || !strings.Contains(string(b), "StatsService") {
+		t.Fatalf("api not fixed: %s", b)
+	}
+	if !hasTopKey(dir, "stats") {
+		t.Fatalf("stats not added (%s)", r)
+	}
+	if repairAPIDeps(dir) != "" {
+		t.Fatal("second run should do nothing")
+	}
+}

@@ -19,10 +19,25 @@ func (a *app) defaultsLoop() {
 	if demoMode {
 		return
 	}
-	time.Sleep(90 * time.Second)
 	dir := *flagConfDir
+	// сначала — починка: службы API без нужных секций не дают Xray запуститься
+	if fixed := repairAPIDeps(dir); fixed != "" {
+		a.watch.mu.Lock()
+		a.watch.addEvent("", "warn", "конфиг Xray исправлен: "+fixed+" — перезапускаю Xray")
+		a.watch.mu.Unlock()
+		a.restartXray()
+	}
+	time.Sleep(90 * time.Second)
 	if !xrayStatsConfigured(dir) {
-		if err := withRollback(dir, func() error { return enableXrayStats(dir) }); err == nil {
+		if err := withRollback(dir, func() error {
+			if err := enableXrayStats(dir); err != nil {
+				return err
+			}
+			if !hasTopKey(dir, "stats") { // без секции stats Xray не запустится
+				return writeChecked(filepath.Join(dir, "08_stats.json"), "{ \"stats\": {} }\n")
+			}
+			return nil
+		}); err == nil {
 			a.watch.mu.Lock()
 			a.watch.addEvent("", "info", "включён подсчёт трафика по серверам — заработает после перезапуска Xray")
 			a.watch.mu.Unlock()
@@ -58,6 +73,10 @@ func withRollback(dir string, fn func() error) error {
 		}
 	}
 	if err := fn(); err != nil {
+		restore()
+		return err
+	}
+	if err := checkXrayDeps(dir); err != nil {
 		restore()
 		return err
 	}
@@ -114,4 +133,45 @@ func removeTelegramRoute(dir string) error {
 	}
 	backupOnce(file, string(raw))
 	return writeChecked(file, s)
+}
+
+// hasTopKey — есть ли ключ верхнего уровня хотя бы в одном конфиге.
+func hasTopKey(dir, key string) bool {
+	for _, f := range readCfgFiles(dir) {
+		if _, ok := f.doc[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// repairAPIDeps — убрать причины «not all dependencies are resolved»:
+// ObservatoryService без observatory и статистику без секции stats.
+func repairAPIDeps(dir string) string {
+	var done []string
+	if !hasTopKey(dir, "observatory") && !hasTopKey(dir, "burstObservatory") {
+		for _, f := range readCfgFiles(dir) {
+			if _, ok := f.doc["api"]; !ok || !strings.Contains(f.raw, `"ObservatoryService"`) {
+				continue
+			}
+			ns := f.raw
+			for _, pat := range []string{`, "ObservatoryService"`, `,"ObservatoryService"`, `"ObservatoryService", `, `"ObservatoryService",`} {
+				ns = strings.Replace(ns, pat, "", 1)
+			}
+			if ns != f.raw && writeChecked(f.path, ns) == nil {
+				backupOnce(f.path, f.raw)
+				done = append(done, "убрана ObservatoryService (нет observatory)")
+			}
+		}
+	}
+	all := ""
+	for _, f := range readCfgFiles(dir) {
+		all += f.raw
+	}
+	if (strings.Contains(all, `"StatsService"`) || strings.Contains(all, "statsOutbound")) && !hasTopKey(dir, "stats") {
+		if writeChecked(filepath.Join(dir, "08_stats.json"), "{ \"stats\": {} }\n") == nil {
+			done = append(done, "добавлена секция stats")
+		}
+	}
+	return strings.Join(done, ", ")
 }

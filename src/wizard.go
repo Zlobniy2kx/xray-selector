@@ -301,12 +301,14 @@ func (a *app) routerChecks() []wizCheck {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	_, err := a.api.GetObservatory(ctx)
 	cancel()
-	add("Связь с Xray (API)", err == nil && c.apiFound, map[bool]string{true: "работает", false: "не отвечает — проверьте секцию api в конфигах"}[err == nil && c.apiFound])
+	// без observatory служба ObservatoryService не включена — это не ошибка API
+	apiOK := c.apiFound && (err == nil || (!hasTopKey(*flagConfDir, "observatory") && !hasTopKey(*flagConfDir, "burstObservatory") && a.mainXrayPid() != ""))
+	add("Связь с Xray (API)", apiOK, map[bool]string{true: "работает", false: "не отвечает — проверьте секцию api в конфигах"}[apiOK])
 	add("Группа серверов (balancer)", len(c.groups) > 0, func() string {
 		if len(c.groups) > 0 {
 			return c.groups[0].Tag
 		}
-		return "нет — панель не сможет выбирать сервер"
+		return "нет — нажмите «Создать группу» ниже"
 	}())
 	if _, err := rciGet("show/version"); err == nil {
 		add("Связь с Keenetic", true, "RCI 127.0.0.1:79")
@@ -394,6 +396,14 @@ func (a *app) handleWizard(w http.ResponseWriter, r *http.Request) {
 		}
 		go a.wizRunCheck(c, req.Action, src, req.Action == "pick")
 		writeJSON(w, map[string]any{"ok": true, "total": len(c.servers)})
+	case "make-balancer":
+		n, err := a.makeBalancer()
+		if err != nil {
+			fail(err)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "servers": n})
+		return
 	case "apply-servers":
 		if demoMode {
 			fail(errors.New("в учебном режиме серверы XKeen не меняются"))
