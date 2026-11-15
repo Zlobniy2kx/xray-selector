@@ -29,16 +29,39 @@ if [ "$1" = "--uninstall" ]; then
 fi
 
 CONF=/opt/etc/xray/configs
+
+# ---- проверки до установки: понятное сообщение вместо непонятной ошибки ----
+fail() { echo; echo "✕ $1"; [ -n "$2" ] && echo "  $2"; echo "Ничего не изменено."; exit 1; }
+[ -d /opt/bin ] && { command -v opkg >/dev/null 2>&1 || [ -x /opt/bin/opkg ]; } \
+  || fail "Не найден Entware." "Установите Entware по инструкции Keenetic (help.keenetic.com, «Установка системы пакетов Entware»)."
+{ command -v xkeen >/dev/null 2>&1 || [ -x /opt/sbin/xkeen ]; } \
+  || fail "Не найден XKeen." "Установите XKeen: https://github.com/Skrill0/XKeen"
+[ -d "$CONF" ] || fail "Не найдена папка конфигов Xray: $CONF" "Проверьте, что XKeen установлен и хотя бы раз запускался."
+FREE_KB=$(df -k /opt 2>/dev/null | awk 'NR==2{print $4}')
+[ -n "$FREE_KB" ] && [ "$FREE_KB" -lt 20480 ] 2>/dev/null \
+  && fail "Мало места на накопителе Entware: свободно $((FREE_KB/1024)) МБ, нужно около 20 МБ." "Освободите место на USB-накопителе или во встроенной памяти."
+
 NOBAL=0
 grep -qs '"balancers"' "$CONF"/*.json || NOBAL=1
 
+# ---- сборка под процессор: сначала по uname, затем проверкой — запускается ли файл ----
 case "$(uname -m)" in
-  aarch64|arm64) BIN=xray-selector-arm64 ;;
-  mips)          BIN=xray-selector-mips ;;
-  mipsel|mipsle) BIN=xray-selector-mipsle ;;
-  *) echo "Неизвестная архитектура: $(uname -m)"; exit 1 ;;
+  aarch64|arm64) FIRST=xray-selector-arm64 ;;
+  mips)          FIRST=xray-selector-mips ;;
+  mipsel|mipsle) FIRST=xray-selector-mipsle ;;
+  *)             FIRST="" ;;
 esac
-echo "Архитектура: $(uname -m) → $BIN"
+BIN=""
+for c in $FIRST xray-selector-arm64 xray-selector-mipsle xray-selector-mips; do
+  [ -f "$c" ] || continue
+  chmod 755 "$c" 2>/dev/null
+  rc=0; "./$c" -h >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -lt 126 ]; then BIN=$c; break; fi
+done
+CPU=$(grep -m1 -i -E 'model name|cpu model|system type' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//')
+[ -n "$BIN" ] || fail "Ни одна сборка не запускается на этом роутере ($(uname -m), ${CPU:-процессор неизвестен})." \
+  "Перешлите эту строку автору: https://github.com/Zlobniy2kx/xray-selector/issues"
+echo "Процессор: $(uname -m)${CPU:+ · $CPU} → $BIN"
 
 [ -x /opt/etc/init.d/S99xray-selector ] && /opt/etc/init.d/S99xray-selector stop >/dev/null 2>&1 || true
 cp "$BIN" /opt/sbin/xray-selector
@@ -97,7 +120,15 @@ if [ "$NEED_RESTART" = 1 ]; then
 fi
 
 /opt/etc/init.d/S99xray-selector start
-sleep 1
+sleep 2
+if ! pidof xray-selector >/dev/null 2>&1; then
+  echo
+  echo "✕ Панель установлена, но не запустилась. Последние строки журнала:"
+  tail -n 15 /opt/var/log/xray-selector.log 2>/dev/null
+  echo "Роутер: $(uname -m)${CPU:+ · $CPU}, сборка $BIN"
+  echo "Перешлите это автору: https://github.com/Zlobniy2kx/xray-selector/issues"
+  exit 1
+fi
 echo
 echo "Готово. Панель: http://$LAN_IP:$PORT"
 [ "$NOBAL" = 1 ] && echo "В конфигах XKeen нет группы серверов — мастер в панели предложит создать её одной кнопкой."
