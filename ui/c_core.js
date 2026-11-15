@@ -59,11 +59,11 @@ document.addEventListener('mousemove',e=>{if(!fxOn())return;const c=e.target.clo
 
 // ---------- навигация (2.3: 8 разделов, внутри — вкладки) ----------
 // Ключ вкладки: «страница» или «страница:фильтр». Страница — это <section id="p-…">.
-const SECS=[['home','◉','Обзор'],['watch','🛡','Сторож'],['servers','☰','Серверы'],
+const SECS=[['home','◉','Обзор'],['watch','🛡','Сторож',[['watch','Обзор'],['settings:watch','Настройки']]],['servers','☰','Серверы'],
   ['devices','📱','Устройства',[['devices','Список'],['map','Карта']]],
-  ['sites','🌐','Правила'],['net','📶','Сеть'],
+  ['sites','🌐','Правила'],['net','📶','Сеть',[['net','Состояние'],['tools:reserve','Резерв']]],
   ['logs','🗒','Журнал',[['events','События'],['logs:access','Xray'],['logs:keenetic','Роутер'],['logs:selector','Программа']]],
-  ['settings','⚙','Настройки',[['settings:main','Основные'],['settings:tg','Telegram'],['tools:sub','Подписка'],['tools:reserve','Резерв'],['tools:maint','Обслуживание'],['settings:pw','Пароль']]]];
+  ['settings','⚙','Настройки',[['settings:main','Основные'],['settings:tg','Telegram'],['tools:sub','Подписка'],['tools:xray','Xray'],['settings:pw','Пароль']]]];
 const PAGES=SECS; // совместимость со старым кодом
 const TABS=['home','watch','servers','devices','more'];
 let pageKey=store.get('pageKey','home'), pageFilter='';

@@ -155,18 +155,15 @@ function renderTools(){
    <div id="resOut" class="note" style="margin-top:8px"></div>
    <div class="note" style="margin-top:6px">Если загрузить в Keenetic новый файл в то же подключение (например, новый .conf в Wireguard0), резерв продолжит работать сам — привязка идёт к подключению, а не к файлу.</div></div>
 
-  <div class="card x-exp" data-st="maint"><h3>Базы сайтов (geosite / geoip)<span class="r">${esc(m.xray||'')}</span></h3>
+  <div class="card" data-st="xray"><h3>Базы сайтов (geosite / geoip)<span class="r">${esc(m.xray||'')}</span></h3>
    <table class="t">${(m.dat||[]).map(d=>`<tr><td>${esc(d.name)}</td><td class="mono n">${(d.size/1048576).toFixed(1)} МБ</td><td class="note">${new Date(d.mod*1000).toLocaleDateString('ru')} · ${ago(d.mod)}</td></tr>`).join('')||'<tr><td class="n">не найдено в '+esc(m.assetDir||'')+'</td></tr>'}</table>
    <div class="tools" style="margin-top:10px"><button class="btn pri" id="geoUpd">Обновить базы</button></div><div id="geoOut" style="margin-top:8px"></div></div>
 
-  <div class="card x-exp" data-st="maint"><h3>Самовосстановление</h3>
+  <div class="card" data-st="xray"><h3>Самовосстановление</h3>
    <div class="note">Раз в 10 минут, пока Xray работает, программа запоминает конфиги как «рабочие». Если Xray перестанет запускаться из-за ошибки в конфиге, она сама вернёт рабочий набор.</div>
    <div style="margin:8px 0">Рабочий набор: <b>${esc(m.goodSnapshot||'ещё нет')}</b></div><button class="btn" id="snapBtn">Запомнить текущие сейчас</button>
    <h3 style="margin-top:16px">Резервные копии</h3>${(m.backups||[]).slice(0,6).map(b=>`<div style="display:flex;gap:12px;align-items:center;padding:7px 0;border-top:1px solid var(--line)"><span class="mono n" style="white-space:nowrap">${esc(b.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d).*/,'$3.$2 $4:$5'))}</span><span style="flex:1;min-width:0">${esc(b.what||'')}</span><button class="btn sm" data-restore="${esc(b.id)}">Вернуть</button></div>`).join('')||'<div class="note">Пока нет</div>'}</div>
 
-  <div class="card" data-st="maint"><h3>Обновление панели<span class="r">сейчас ${esc(m.selector)} · ${esc(m.arch)}</span></h3>
-   <div class="note" style="margin-bottom:8px">Выберите архив xray-selector.tar.gz — панель сама возьмёт нужный файл, проверит его на роутере и перезапустится. SSH не нужен.</div>
-   <div class="tools"><input type="file" id="updFile" accept=".gz,.tgz" class="in"><button class="btn pri" id="updBtn">Установить</button></div><div id="updOut" class="note" style="margin-top:8px"></div></div>
   </div>${maintExtra()}`;
   filterCards(el);
 }
@@ -261,7 +258,7 @@ function tunnelCard(){
       <td class="c-chk"><div class="chk">${chips}</div></td><td class="c-spd mono">${spd}<div class="n" style="font-size:11px">Мбит/с</div></td><td class="c-sc">${scoreHTML(sc)}</td></tr>`}).join('');
   return `<div class="card"><h3>🛟 Подключения Keenetic<span class="r">${TUN.off?'проверка выключена':'каждые '+(TUN.every||60)+' с'} · <button class="btn sm" data-tunall="1">⇩ Взять все в резерв</button> <button class="btn sm" data-tuncheck="1">⚡ Проверить сейчас</button></span></h3>
    <table class="t wt"><thead><tr><th>Подключение</th><th>Сервисы</th><th>Скорость</th><th>Баллы</th></tr></thead><tbody>${rows}</tbody></table>
-   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — в «Обслуживании»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
+   <div class="note" style="margin-top:8px">Проверяются те же сервисы и скорость, что у серверов подписки, — видно, на что можно рассчитывать, если провайдер срежет все серверы. Какие подключения брать в резерв — в «Сеть → Резерв»; при аварии сторож возьмёт здоровое с лучшими баллами.</div></div>`}
 
 // ================= ОБРЫВЫ ИНТЕРНЕТА =================
 var PULSE=null;

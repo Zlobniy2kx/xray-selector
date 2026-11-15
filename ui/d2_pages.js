@@ -172,7 +172,7 @@ function renderSettings(){const el=$('#p-settings');if(el.contains(document.acti
   <div class="card" data-st="main"><h3>Оформление</h3><div class="tools"><span class="note">Тема:</span><div class="seg">${[['xrock','Ночная'],['srm','Светлая (SRM)']].map(([k,t])=>`<button data-settheme="${k}" class="${th===k?'on':''}">${t}</button>`).join('')}</div>
    <span class="note" style="margin-left:14px">Эффекты:</span><div class="seg">${[['auto','Авто'],['full','Полные'],['lite','Лёгкие']].map(([k,t])=>`<button data-fx="${k}" class="${fx===k?'on':''}">${t}</button>`).join('')}</div></div>
    <div class="note" style="margin-top:8px">«Авто»: на компьютере — живой фон, стекло, 3D-наклон карточек и частицы на карте; на телефоне — лёгкая версия. Тема и эффекты запоминаются на каждом устройстве отдельно.</div></div>
-  <div class="card x-exp" data-st="main"><h3>Сторож — тонкая настройка</h3><div class="fg">
+  <div class="card" data-st="watch"><h3>Настройки сторожа</h3><div class="fg">
    <label class="full">Что проверять — по строке «Название = адрес»<textarea class="in" id="sTargets">${esc((st.targets||[]).map(t=>t.name+' = '+t.url).join('\n'))}</textarea></label>
    <label>Проверять активный каждые, сек<input class="in" id="sInt" type="number" min="5" value="${st.intervalSec||15}"></label>
    <label>Проверять запасные каждые, сек<input class="in" id="sRes" type="number" min="15" value="${st.reserveEverySec||60}"></label>

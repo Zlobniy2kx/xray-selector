@@ -60,7 +60,7 @@ function renderMetrics(){
   const box=$('#metCards'); if(!box) return; const m=MET; const P=(m&&m.points)||[]; const last=P[P.length-1]||{};
   const memMB=last.mem?Math.round(last.mem/1024):0, totMB=m&&m.memTotal?Math.round(m.memTotal/1024):0;
   const cards=[
-    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?'нагрузка '+m.load:'',P.map(p=>p.cpu),'#a78bfa'],
+    ['Процессор',m&&m.cores?m.cores+' ядра':'',`${last.cpu??'—'}<small>%</small>`,m&&m.load?(()=>{const l=parseFloat(String(m.load).split(/\s+/)[0])||0,c=m.cores||1,r=l/c;return (r<0.7?'роутер спокоен':r<1.5?'роутер занят':'роутер перегружен')+' · очередь '+l.toFixed(2)+' на '+c+' яд.'})():'',P.map(p=>p.cpu),'#a78bfa'],
     ['Память',totMB?totMB+' МБ':'',`${memMB||'—'}<small>МБ · ${totMB?Math.round(memMB*100/totMB):'—'}%</small>`,last.xrayM?'Xray: '+Math.round(last.xrayM/1024)+' МБ':'',P.map(p=>p.mem),'#22d3ee'],
     ['Интернет'+(m&&m.iface?' · '+m.iface:''),`↑ ${last.tx??'—'}`,`↓ ${last.rx??'—'}<small>Мбит/с</small>`,'вход и выход за час',P.map(p=>p.rx),'#34d399',P.map(p=>p.tx)],
     m&&m.hasTemp?['Температура','',`${last.temp?last.temp.toFixed(0):'—'}<small>°C</small>`,'датчик роутера',P.map(p=>p.temp),'#fbbf24']
@@ -210,7 +210,7 @@ function homeProviders(){const w=TRF&&TRF.wans||[];const by=TRF&&TRF.ispBy||{};
       <div class="bar" style="height:12px">${ispBar(l)}</div><div class="mono ${!last?'n':last.ok?'g':'b'}" style="white-space:nowrap">${!last?'—':last.ok?last.ms+' мс':'нет связи'}${bad?` <span class="m">· ${bad} сбоев</span>`:''}</div></div>`}).join('')}${connVPN()}</div>`}
 // VPN и прокси Keenetic (WireGuard, Proxy…) — внутри блока «Подключения»
 function connVPN(){const l=(typeof TUN!=='undefined'&&TUN&&TUN.tunnels)||[];
-  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси Keenetic не проверяются. Отметьте их в «Настройки → Резерв», чтобы видеть здесь, работают ли они.</div>`;
+  if(!l.length)return `<div class="note" style="margin-top:10px">VPN и прокси Keenetic не проверяются. Отметьте их в «Сеть → Резерв», чтобы видеть здесь, работают ли они.</div>`;
   return `<div class="note" style="margin:12px 0 4px;font-weight:600">VPN и прокси Keenetic</div>${l.map(r=>{const x=r.iface,h=r.health;
     const okN=h&&h.targets?Object.values(h.targets).filter(t=>t.ok).length:0,all=h&&h.targets?Object.keys(h.targets).length:0;
     return `<div style="display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;margin:8px 0"><div><b>${esc(x.desc||x.id||x.name)}</b>${r.inReserve?' <span class="tag">в резерве</span>':''}${TUN.active===x.tag?' <span class="tag g">● сейчас через него</span>':''}<div class="note">${esc(x.type)} · ${esc(x.id||x.name)}</div></div>

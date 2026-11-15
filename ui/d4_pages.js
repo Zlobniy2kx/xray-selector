@@ -6,32 +6,39 @@ const qh=t=>`<span class="qhelp" title="${esc(t)}">?</span>`;
 
 // ================= СЕТЬ =================
 function renderNet(){const el=$('#p-net');
-  el.innerHTML=`${homeProviders()}${typeof pulseCard==='function'?pulseCard():''}${typeof dnsCard==='function'?dnsCard():''}`;
+  el.innerHTML=`${homeProviders()}${loadCard()}${typeof pulseCard==='function'?pulseCard():''}${typeof dnsCard==='function'?dnsCard():''}`;
 }
 
 // ================= ОБСЛУЖИВАНИЕ: дополнения 2.3 =================
+function loadCard(){const a=ABOUT||{};const g=a.guard||{};
+  const lv=['<span class="g">спокойно</span>','<span class="m">занят — фоновые проверки реже</span>','<span class="b">перегружен — только самое нужное</span>'][g.level||0];
+  return `<div class="card"><h3>Нагрузка роутера ${qh('Если роутер занят (нагрузка выше двух на ядро), панель реже проверяет серверы и откладывает полную проверку. Большие базы сайтов не загружаются, если мало свободной памяти.')}</h3>
+    <div class="kv"><div><span>Сейчас</span><b>${lv}</b></div><div><span>Нагрузка</span><b class="mono">${g.load1!=null?g.load1.toFixed(2):'—'} · ядер ${g.cores||'—'}</b></div>
+    <div><span>Свободно памяти</span><b class="mono">${g.availMB>=0?g.availMB+' МБ':'—'}</b></div><div><span>Притормаживали</span><b class="mono">${g.slowed||0} раз</b></div></div>
+    ${g.last?`<div class="note" style="margin-top:6px">${esc(g.last)}</div>`:''}</div>`}
+function updCard(){const a=ABOUT||{};
+  return `<div class="grid g2"><div class="card"><h3>Обновления ${qh('Панель сама проверяет новую версию на GitHub через минуту после запуска и затем каждые 6 часов — сначала через рабочий VPN-сервер, если не вышло — напрямую.')}</h3>${updBlock()}
+    <details style="margin-top:12px"><summary class="note" style="cursor:pointer">Установить из файла (если GitHub недоступен)</summary>
+    <div class="note" style="margin:8px 0">Выберите архив xray-selector.tar.gz — панель возьмёт нужный файл, проверит его на роутере и перезапустится. SSH не нужен.</div>
+    <div class="tools"><input type="file" id="updFile" accept=".gz,.tgz" class="in"><button class="btn" id="updBtn">Установить из файла</button></div><div id="updOut" class="note" style="margin-top:8px"></div></details></div>
+  <div class="card"><h3>О программе</h3>
+    <div class="kv"><div><span>Название</span><b>${esc(a.name||'xray-selector')}</b></div><div><span>Версия</span><b class="mono">${esc(a.version||(S&&S.version)||'')}</b></div><div><span>Автор</span><b>${esc(a.author||'Злобыч')}</b></div></div>
+    <div class="note" style="margin-top:8px">${esc(a.desc||'')}</div>
+    <div class="tools" style="margin-top:8px">${a.projectURL?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(a.projectURL)}">Страница проекта ↗</a>`:''}${a.supportURL?`<a class="lnk" target="_blank" rel="noopener" href="${esc(a.supportURL)}" style="font-size:13px">♥ Сказать спасибо разработчику</a>`:''}</div></div></div>`}
+function refreshUpdCard(){const c=$('#updCardWrap');if(c&&!c.contains(document.activeElement))c.innerHTML=updCard()}
 function maintExtra(){const a=ABOUT||{};const g=a.guard||{};
   const lv=['<span class="g">спокойно</span>','<span class="m">занят — фоновые проверки реже</span>','<span class="b">перегружен — только самое нужное</span>'][g.level||0];
   return `<div class="grid g2">
-  ${a.xkeenUI?`<div class="card" data-st="maint"><h3>XKeen UI</h3><div class="row"><span>Найдена XKeen UI</span><a class="btn sm" target="_blank" rel="noopener" href="${location.protocol}//${location.hostname}:${a.xkeenUIPort||1000}/">открыть ↗</a></div>
+  ${a.xkeenUI?`<div class="card" data-st="xray"><h3>XKeen UI</h3><div class="row"><span>Найдена XKeen UI</span><a class="btn sm" target="_blank" rel="noopener" href="${location.protocol}//${location.hostname}:${a.xkeenUIPort||1000}/">открыть ↗</a></div>
     <div class="banner" style="margin-top:8px">Не меняйте серверы и правила в двух панелях одновременно — одна перепишет изменения другой.</div></div>`:''}
-  <div class="card x-exp" data-st="maint"><h3>Нагрузка роутера ${qh('Если роутер занят (нагрузка выше двух на ядро), панель реже проверяет серверы и откладывает полную проверку. Большие базы сайтов не загружаются, если мало свободной памяти.')}</h3>
-    <div class="kv"><div><span>Сейчас</span><b>${lv}</b></div><div><span>Нагрузка</span><b class="mono">${g.load1!=null?g.load1.toFixed(2):'—'} · ядер ${g.cores||'—'}</b></div>
-    <div><span>Свободно памяти</span><b class="mono">${g.availMB>=0?g.availMB+' МБ':'—'}</b></div><div><span>Притормаживали</span><b class="mono">${g.slowed||0} раз</b></div></div>
-    ${g.last?`<div class="note" style="margin-top:6px">${esc(g.last)}</div>`:''}</div>
-  ${isExpert()?`<div class="card" data-st="maint"><h3>Конфиги Xray (JSON) <span class="tag m">экспертный режим</span></h3>
+  ${isExpert()?`<div class="card" data-st="xray"><h3>Конфиги Xray (JSON) <span class="tag m">экспертный режим</span></h3>
     <div class="note" style="margin-bottom:8px">Правка файлов в ${esc('/opt/etc/xray/configs')}. Перед записью — проверка <code>xray -test</code>, резервная копия, перезапуск; если Xray не поднимется за 30 с — откат.</div>
     <div class="tools"><button class="btn" id="xcfgOpen">Открыть редактор</button></div></div>`:''}
-  <div class="card" data-st="maint"><h3>Новые версии ${qh('Раз в сутки панель смотрит последнюю версию на GitHub — сначала через рабочий VPN-сервер, если не вышло — напрямую.')}</h3>${updBlock()}</div>
-  <div class="card" data-st="maint"><h3>О программе</h3>
-    <div class="kv"><div><span>Название</span><b>${esc(a.name||'xray-selector')}</b></div><div><span>Версия</span><b class="mono">${esc(a.version||(S&&S.version)||'')}</b></div><div><span>Автор</span><b>${esc(a.author||'Злобыч')}</b></div></div>
-    <div class="note" style="margin-top:8px">${esc(a.desc||'')}</div>
-    <div class="tools" style="margin-top:8px">${a.projectURL?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(a.projectURL)}">Страница проекта ↗</a>`:''}${a.supportURL?`<a class="lnk" target="_blank" rel="noopener" href="${esc(a.supportURL)}" style="font-size:13px">♥ Сказать спасибо разработчику</a>`:''}</div></div>
   </div>`;
 }
 
 let UPD=null;
-async function loadUpd(){try{UPD=await api('/api/update')}catch(e){}updBanner()}
+async function loadUpd(){try{UPD=await api('/api/update')}catch(e){}updBanner();refreshUpdCard()}
 function updBanner(){const el=$('#updBar');if(!el)return;const u=UPD;
   if(!u||!u.newer||!u.canInstall||(ABOUT&&ABOUT.demo)||store.get('updLater','')===u.latest){el.innerHTML='';return}
   const notes=String(u.notes||'').replace(/```[a-z]*\n?/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').trim();
@@ -40,7 +47,7 @@ function updBanner(){const el=$('#updBar');if(!el)return;const u=UPD;
    ${notes?`<div class="notes">${esc(notes)}</div>`:''}
    <div class="tools"><button class="btn pri" id="updInstall">Установить ${esc(u.latest)}</button><button class="btn" id="updLater">Позже</button>${u.page?`<a class="lnk" target="_blank" rel="noopener" href="${esc(u.page)}">подробнее ↗</a>`:''}</div></div>`}
 function updBlock(){const u=UPD;if(!u)return '<div class="note">…</div>';
-  if(!u.repo)return '<div class="note">Проверка обновлений включится, когда программа будет опубликована на GitHub. Пока обновляйте архивом выше.</div>';
+  if(!u.repo)return '<div class="note">Проверка обновлений включится, когда программа будет опубликована на GitHub. Пока обновляйте из файла ниже.</div>';
   return `<div class="kv"><div><span>Сейчас</span><b class="mono">${esc(u.current)}</b></div><div><span>На GitHub</span><b class="mono ${u.newer?'g':''}">${esc(u.latest||'—')}</b></div></div>
    <div class="note" style="margin-top:6px">${u.checked?'проверено '+ago(u.checked)+(u.via?' · '+esc(u.via):''):'ещё не проверялось'}${u.err?' · <span class="b">'+esc(u.err)+'</span>':''}</div>
    ${u.newer&&u.notes?`<div class="note" style="white-space:pre-wrap;margin-top:6px;max-height:140px;overflow:auto">${esc(u.notes)}</div>`:''}
@@ -48,7 +55,7 @@ function updBlock(){const u=UPD;if(!u)return '<div class="note">…</div>';
 // ================= Режим интерфейса (в Настройках → Основные) =================
 const _origRS2=renderSettings;
 renderSettings=function(){const el=$('#p-settings');if(el.contains(document.activeElement)&&['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;
-  _origRS2();let c=$('#modeCard');if(!c){c=document.createElement('div');c.id='modeCard';c.dataset.st='main';const pw=$('#pwCard');pw?pw.after(c):el.prepend(c)}
+  _origRS2();{let u=$('#updCardWrap');if(!u){u=document.createElement('div');u.id='updCardWrap';u.dataset.st='main';el.appendChild(u)}u.innerHTML=updCard()}let c=$('#modeCard');if(!c){c=document.createElement('div');c.id='modeCard';c.dataset.st='main';const pw=$('#pwCard');pw?pw.after(c):el.prepend(c)}
   c.innerHTML=`<div class="card"><h3>Режим интерфейса</h3><div class="tools"><div class="seg">${[['simple','Простой'],['expert','Экспертный']].map(([k,t])=>`<button data-uimode="${k}" class="${store.get('uiMode','simple')===k?'on':''}">${t}</button>`).join('')}</div></div>
    <div class="tools" style="margin-top:10px"><button class="btn" id="wzAgain">🧭 Пройти мастер заново</button></div>
    <div class="note" style="margin-top:8px">Простой режим прячет тонкие настройки сторожа, технические журналы и служебные карточки. Экспертный показывает всё, плюс правку JSON-конфигов Xray. Запоминается на этом устройстве.</div></div>`;
